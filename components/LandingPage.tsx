@@ -1,11 +1,12 @@
 import React from 'react';
-import { Sprout, TrendingUp, Shield, Zap, Users, Globe, ArrowRight, CheckCircle2, Sparkles, LineChart, Award } from 'lucide-react';
+import { Sprout, TrendingUp, Shield, Zap, Users, Globe, ArrowRight, CheckCircle2, Sparkles, LineChart, Award, Search } from 'lucide-react';
 
 interface Props {
   onGetStarted: () => void;
+  onVerify?: () => void;
 }
 
-export const LandingPage: React.FC<Props> = ({ onGetStarted }) => {
+export const LandingPage: React.FC<Props> = ({ onGetStarted, onVerify }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50">
       {/* Pioneer Badge */}
@@ -127,6 +128,15 @@ export const LandingPage: React.FC<Props> = ({ onGetStarted }) => {
                 <div>
                   <div className="font-semibold text-emerald-400 mb-2">✓ Our Solution</div>
                   <p className="text-sm">Scan QR codes for complete livestock history: birth, feeding, health records, and processing via MeatHouse</p>
+                  {onVerify && (
+                    <button 
+                      onClick={onVerify}
+                      className="mt-3 text-emerald-400 hover:text-emerald-300 font-semibold text-sm flex items-center gap-1 transition-colors"
+                    >
+                      <Search size={16} />
+                      Try Verification Now →
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -499,6 +509,13 @@ export const LandingPage: React.FC<Props> = ({ onGetStarted }) => {
                 <li><a href="#" className="hover:text-emerald-400 transition-colors">How It Works</a></li>
                 <li><a href="#" className="hover:text-emerald-400 transition-colors">Marketplace</a></li>
                 <li><a href="https://farmchaincoop.netlify.app" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400 transition-colors">Join the Coop</a></li>
+                {onVerify && (
+                  <li>
+                    <button onClick={onVerify} className="hover:text-emerald-400 transition-colors text-left">
+                      Verify Livestock
+                    </button>
+                  </li>
+                )}
               </ul>
             </div>
 

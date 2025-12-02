@@ -107,6 +107,7 @@ export enum AppView {
   MARKET = 'MARKET',
   DETAILS = 'DETAILS',
   ADMIN = 'ADMIN',
+  VERIFY = 'VERIFY',
 }
 
 export interface WalletState {

@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 import { Marketplace } from './components/Marketplace';
 import { CowDetails } from './components/CowDetails';
 import { AdminDashboard } from './components/AdminDashboard';
+import { VerifyPage } from './components/VerifyPage';
 import { Web3Service } from './services/web3Service';
 import { EscrowService } from './services/escrowService';
 import { IPFSService } from './services/ipfsService';
@@ -369,7 +370,15 @@ const App: React.FC = () => {
 
   // Show landing page if not connected and on landing view
   if (view === AppView.LANDING) {
-    return <LandingPage onGetStarted={() => setView(AppView.DASHBOARD)} />;
+    return <LandingPage 
+      onGetStarted={() => setView(AppView.DASHBOARD)} 
+      onVerify={() => setView(AppView.VERIFY)}
+    />;
+  }
+
+  // Show verify page
+  if (view === AppView.VERIFY) {
+    return <VerifyPage allCows={allCows} onBack={() => setView(AppView.LANDING)} />;
   }
 
   return (
