@@ -238,10 +238,10 @@ export const Web3Service = {
 
     // Asset config transaction (only updating note/metadata)
     const txn = algosdk.makeAssetConfigTxnWithSuggestedParamsFromObject({
-      sender: admin.addr.toString(),
+      from: admin.addr,
       assetIndex: cowData.assetId,
-      manager: admin.addr.toString(),
-      reserve: admin.addr.toString(),
+      manager: admin.addr,
+      reserve: admin.addr,
       freeze: undefined,
       clawback: undefined,
       note: note,
@@ -312,8 +312,8 @@ export const Web3Service = {
 
     // Step 1: User Opt-In (signed by user via Pera Wallet)
     const optInTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-      sender: userAddress,
-      receiver: userAddress,
+      from: userAddress,
+      to: userAddress,
       assetIndex: assetId,
       amount: 0,
       suggestedParams: params,
@@ -332,8 +332,8 @@ export const Web3Service = {
     const params2 = await algodClient.getTransactionParams().do();
     
     const transferTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-      sender: admin.addr.toString(),
-      receiver: userAddress,
+      from: admin.addr,
+      to: userAddress,
       assetIndex: assetId,
       amount: 1,
       suggestedParams: params2,
