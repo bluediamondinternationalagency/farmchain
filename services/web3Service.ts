@@ -110,7 +110,7 @@ export const Web3Service = {
     // ARC-69 Dynamic Metadata in Note
     const arc69Metadata = {
       standard: "arc69",
-      description: `Farm Chain Cattle NFT - ${cowData.name}`,
+      description: `Farm Chain Livestock - ${cowData.name}`,
       external_url: "https://farmchain.app",
       properties: {
         breed: cowData.breed,
@@ -118,27 +118,33 @@ export const Web3Service = {
         health_score: cowData.healthScore,
         status: cowData.status,
         purchase_date: cowData.purchaseDate,
-        last_updated: Date.now(),
-        traits: {
-          breed: cowData.breed,
-          initial_weight_kg: cowData.weight,
-          health_status: cowData.healthScore >= 90 ? "Excellent" : "Good"
-        }
+        last_updated: Date.now()
       }
     };
     
     const note = new TextEncoder().encode(JSON.stringify(arc69Metadata));
+    
+    // Ensure note is not too large (max 1024 bytes)
+    if (note.length > 1024) {
+      throw new Error('Metadata too large. Please reduce description or properties.');
+    }
+
+    // Ensure assetURL is within 96 character limit
+    const trimmedAssetURL = assetURL.substring(0, 96);
+    
+    // Ensure assetName is within 32 character limit
+    const trimmedAssetName = cowData.name.substring(0, 32);
 
     const txn = algosdk.makeAssetCreateTxnWithSuggestedParamsFromObject({
-      sender: admin.addr.toString(),
+      from: admin.addr,
       total: 1,
       decimals: 0,
-      assetName: cowData.name.substring(0, 32), // max 32 chars
-      unitName: 'CATTLE',
-      assetURL: assetURL,
+      assetName: trimmedAssetName,
+      unitName: 'FCLSTK', // FarmChain Livestock
+      assetURL: trimmedAssetURL,
       defaultFrozen: false,
-      manager: admin.addr.toString(), // Needed for updating metadata
-      reserve: admin.addr.toString(),
+      manager: admin.addr,
+      reserve: admin.addr,
       freeze: undefined,
       clawback: undefined,
       note: note,
