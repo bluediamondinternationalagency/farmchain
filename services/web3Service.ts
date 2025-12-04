@@ -98,6 +98,11 @@ export const Web3Service = {
     const params = await algodClient.getTransactionParams().do();
     console.log('Transaction params:', params);
 
+    // Ensure genesisHash is a Uint8Array if it exists
+    if (params.genesisHash && typeof params.genesisHash === 'string') {
+      params.genesisHash = new Uint8Array(Buffer.from(params.genesisHash, 'base64'));
+    }
+
     // Determine image URL (IPFS or HTTP)
     const imageUrl = cowData.imageCID 
       ? `ipfs://${cowData.imageCID}`
@@ -136,18 +141,33 @@ export const Web3Service = {
     // Ensure assetName is within 32 character limit
     const trimmedAssetName = cowData.name.substring(0, 32);
 
-    const txn = algosdk.makeAssetCreateTxnWithSuggestedParamsFromObject({
+    // Debug logging
+    console.log('Transaction parameters:', {
       from: adminAddress,
+      manager: adminAddress,
+      reserve: adminAddress,
+      assetName: trimmedAssetName,
+      assetURL: trimmedAssetURL,
+      noteLength: note.length
+    });
+
+    // Encode addresses to ensure proper format
+    const encodedFrom = algosdk.encodeAddress(algosdk.decodeAddress(adminAddress).publicKey);
+    const encodedManager = algosdk.encodeAddress(algosdk.decodeAddress(adminAddress).publicKey);
+    const encodedReserve = algosdk.encodeAddress(algosdk.decodeAddress(adminAddress).publicKey);
+
+    // Create asset creation transaction
+    // Note: freeze and clawback are omitted entirely (not set to undefined)
+    const txn = algosdk.makeAssetCreateTxnWithSuggestedParamsFromObject({
+      from: encodedFrom,
       total: 1,
       decimals: 0,
       assetName: trimmedAssetName,
-      unitName: 'FCLSTK', // FarmChain Livestock
+      unitName: 'FCLSTK',
       assetURL: trimmedAssetURL,
       defaultFrozen: false,
-      manager: adminAddress,
-      reserve: adminAddress,
-      freeze: undefined,
-      clawback: undefined,
+      manager: encodedManager,
+      reserve: encodedReserve,
       note: note,
       suggestedParams: params,
     });
@@ -235,7 +255,6 @@ export const Web3Service = {
         }
       }
     };
-
     const note = new TextEncoder().encode(JSON.stringify(arc69Metadata));
 
     // Asset config transaction (only updating note/metadata)
@@ -244,8 +263,6 @@ export const Web3Service = {
       assetIndex: cowData.assetId,
       manager: adminAddress,
       reserve: adminAddress,
-      freeze: undefined,
-      clawback: undefined,
       note: note,
       suggestedParams: params,
       strictEmptyAddressChecking: false
