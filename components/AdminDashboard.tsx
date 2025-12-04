@@ -51,7 +51,9 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
   // Form State
   const [formData, setFormData] = useState({
     name: '',
-    breed: 'Holstein',
+    species: 'cattle',
+    breed: '',
+    customBreed: '',
     weight: 400,
     price: 5, // Default 5 ALGO for TestNet (reasonable for demo)
     expectedReturn: 10,
@@ -69,6 +71,17 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
   const handleMint = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate breed selection
+    if (!formData.breed) {
+      alert("Please select a breed");
+      return;
+    }
+    
+    if (formData.breed === 'custom' && !formData.customBreed.trim()) {
+      alert("Please enter a custom breed name");
+      return;
+    }
+    
     // Check balance
     if (adminBalance === null) {
       alert("Checking wallet balance... Please wait a moment and try again.");
@@ -82,10 +95,12 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
     
     setIsMinting(true);
     
+    const finalBreed = formData.breed === 'custom' ? formData.customBreed : formData.breed;
+    
     const newCow: Cow = {
       id: Math.random().toString(36).substring(2, 9).toUpperCase(),
       name: formData.name,
-      breed: formData.breed,
+      breed: finalBreed,
       weight: Number(formData.weight),
       purchasePrice: Number(formData.price),
       purchaseDate: Date.now(),
@@ -279,7 +294,7 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
               <form onSubmit={handleMint} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Cow Name</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Name</label>
                     <input 
                       required
                       type="text" 
@@ -291,18 +306,108 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Livestock Species</label>
+                    <select 
+                      value={formData.species}
+                      onChange={e => setFormData({...formData, species: e.target.value, breed: '', customBreed: ''})}
+                      className="w-full p-3 border border-slate-300 rounded-lg outline-none bg-white"
+                    >
+                      <option value="cattle">Cattle</option>
+                      <option value="goat">Goat</option>
+                      <option value="ram">Ram/Sheep</option>
+                      <option value="poultry">Poultry/Chicken</option>
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Breed</label>
                     <select 
                       value={formData.breed}
-                      onChange={e => setFormData({...formData, breed: e.target.value})}
+                      onChange={e => setFormData({...formData, breed: e.target.value, customBreed: e.target.value === 'custom' ? formData.customBreed : ''})}
                       className="w-full p-3 border border-slate-300 rounded-lg outline-none bg-white"
                     >
-                      <option value="Holstein">Holstein</option>
-                      <option value="Angus">Angus</option>
-                      <option value="Hereford">Hereford</option>
-                      <option value="Wagyu">Wagyu</option>
+                      <option value="">Select Breed</option>
+                      {formData.species === 'cattle' && (
+                        <>
+                          <optgroup label="Nigerian Indigenous Breeds">
+                            <option value="White Fulani">White Fulani</option>
+                            <option value="Red Bororo">Red Bororo</option>
+                            <option value="Sokoto Gudali">Sokoto Gudali</option>
+                            <option value="Wadara">Wadara</option>
+                            <option value="Azawak">Azawak</option>
+                            <option value="Adamawa Gudali">Adamawa Gudali</option>
+                            <option value="Muturu">Muturu</option>
+                            <option value="N'Dama">N'Dama</option>
+                            <option value="Keteku">Keteku</option>
+                            <option value="Kuri">Kuri</option>
+                            <option value="Bokolo">Bokolo</option>
+                          </optgroup>
+                          <optgroup label="International Breeds">
+                            <option value="Holstein">Holstein</option>
+                            <option value="Angus">Angus</option>
+                            <option value="Hereford">Hereford</option>
+                            <option value="Wagyu">Wagyu</option>
+                            <option value="Brahman">Brahman</option>
+                          </optgroup>
+                        </>
+                      )}
+                      {formData.species === 'goat' && (
+                        <>
+                          <optgroup label="Nigerian Goat Breeds">
+                            <option value="Red Sokoto">Red Sokoto</option>
+                            <option value="West African Dwarf">West African Dwarf</option>
+                            <option value="Sahel">Sahel</option>
+                            <option value="Kano Brown">Kano Brown</option>
+                          </optgroup>
+                          <optgroup label="International Breeds">
+                            <option value="Boer">Boer</option>
+                            <option value="Saanen">Saanen</option>
+                            <option value="Alpine">Alpine</option>
+                          </optgroup>
+                        </>
+                      )}
+                      {formData.species === 'ram' && (
+                        <>
+                          <optgroup label="Nigerian Sheep Breeds">
+                            <option value="Yankasa">Yankasa</option>
+                            <option value="Uda">Uda</option>
+                            <option value="Balami">Balami</option>
+                            <option value="West African Dwarf Sheep">West African Dwarf Sheep</option>
+                          </optgroup>
+                          <optgroup label="International Breeds">
+                            <option value="Dorper">Dorper</option>
+                            <option value="Merino">Merino</option>
+                          </optgroup>
+                        </>
+                      )}
+                      {formData.species === 'poultry' && (
+                        <>
+                          <optgroup label="Chicken Breeds">
+                            <option value="Broiler">Broiler</option>
+                            <option value="Layer">Layer</option>
+                            <option value="Noiler">Noiler</option>
+                            <option value="Local Chicken">Local Chicken</option>
+                            <option value="Cockerel">Cockerel</option>
+                          </optgroup>
+                        </>
+                      )}
+                      <option value="custom">Custom Breed...</option>
                     </select>
                   </div>
+
+                  {formData.breed === 'custom' && (
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Custom Breed Name</label>
+                      <input 
+                        required
+                        type="text" 
+                        value={formData.customBreed}
+                        onChange={e => setFormData({...formData, customBreed: e.target.value})}
+                        placeholder="Enter custom breed name"
+                        className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Cattle Type</label>
                     <select 
