@@ -85,11 +85,12 @@ export const Web3Service = {
 
   mintCowNFT: async (cowData: Cow): Promise<number> => {
     const admin = getOrCreateAccount(ADMIN_KEY);
+    const adminAddress = admin.addr.toString();
     
-    console.log('Minting NFT with admin address:', admin.addr);
+    console.log('Minting NFT with admin address:', adminAddress);
     
     // Check balance first
-    const balance = await Web3Service.getBalance(admin.addr);
+    const balance = await Web3Service.getBalance(adminAddress);
     if (balance < 0.2) {
       throw new Error(`Insufficient balance: ${balance.toFixed(4)} ALGO. Need at least 0.2 ALGO to mint.`);
     }
@@ -136,15 +137,15 @@ export const Web3Service = {
     const trimmedAssetName = cowData.name.substring(0, 32);
 
     const txn = algosdk.makeAssetCreateTxnWithSuggestedParamsFromObject({
-      from: admin.addr,
+      from: adminAddress,
       total: 1,
       decimals: 0,
       assetName: trimmedAssetName,
       unitName: 'FCLSTK', // FarmChain Livestock
       assetURL: trimmedAssetURL,
       defaultFrozen: false,
-      manager: admin.addr,
-      reserve: admin.addr,
+      manager: adminAddress,
+      reserve: adminAddress,
       freeze: undefined,
       clawback: undefined,
       note: note,
@@ -209,6 +210,7 @@ export const Web3Service = {
     if (!cowData.assetId) throw new Error("Asset ID required for update");
     
     const admin = getOrCreateAccount(ADMIN_KEY);
+    const adminAddress = admin.addr.toString();
     const params = await algodClient.getTransactionParams().do();
 
     // Updated ARC-69 metadata
@@ -238,10 +240,10 @@ export const Web3Service = {
 
     // Asset config transaction (only updating note/metadata)
     const txn = algosdk.makeAssetConfigTxnWithSuggestedParamsFromObject({
-      from: admin.addr,
+      from: adminAddress,
       assetIndex: cowData.assetId,
-      manager: admin.addr,
-      reserve: admin.addr,
+      manager: adminAddress,
+      reserve: adminAddress,
       freeze: undefined,
       clawback: undefined,
       note: note,
@@ -308,6 +310,7 @@ export const Web3Service = {
 
   assignAssetToUser: async (assetId: number, userAddress: string) => {
     const admin = getOrCreateAccount(ADMIN_KEY);
+    const adminAddress = admin.addr.toString();
     const params = await algodClient.getTransactionParams().do();
 
     // Step 1: User Opt-In (signed by user via Pera Wallet)
@@ -332,7 +335,7 @@ export const Web3Service = {
     const params2 = await algodClient.getTransactionParams().do();
     
     const transferTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-      from: admin.addr,
+      from: adminAddress,
       to: userAddress,
       assetIndex: assetId,
       amount: 1,
