@@ -85,9 +85,11 @@ export const Web3Service = {
 
   mintCowNFT: async (cowData: Cow): Promise<number> => {
     const admin = getOrCreateAccount(ADMIN_KEY);
+    // admin.addr is an Address object with a toString() method
     const adminAddress = admin.addr.toString();
     
     console.log('Minting NFT with admin address:', adminAddress);
+    console.log('Admin address type:', typeof adminAddress);
     
     // Check balance first
     const balance = await Web3Service.getBalance(adminAddress);
@@ -151,23 +153,17 @@ export const Web3Service = {
       noteLength: note.length
     });
 
-    // Encode addresses to ensure proper format
-    const encodedFrom = algosdk.encodeAddress(algosdk.decodeAddress(adminAddress).publicKey);
-    const encodedManager = algosdk.encodeAddress(algosdk.decodeAddress(adminAddress).publicKey);
-    const encodedReserve = algosdk.encodeAddress(algosdk.decodeAddress(adminAddress).publicKey);
-
     // Create asset creation transaction
-    // Note: freeze and clawback are omitted entirely (not set to undefined)
     const txn = algosdk.makeAssetCreateTxnWithSuggestedParamsFromObject({
-      from: encodedFrom,
-      total: 1,
+      sender: adminAddress,
+      total: BigInt(1),
       decimals: 0,
       assetName: trimmedAssetName,
       unitName: 'FCLSTK',
       assetURL: trimmedAssetURL,
       defaultFrozen: false,
-      manager: encodedManager,
-      reserve: encodedReserve,
+      manager: adminAddress,
+      reserve: adminAddress,
       note: note,
       suggestedParams: params,
     });
@@ -259,7 +255,7 @@ export const Web3Service = {
 
     // Asset config transaction (only updating note/metadata)
     const txn = algosdk.makeAssetConfigTxnWithSuggestedParamsFromObject({
-      from: adminAddress,
+      sender: adminAddress,
       assetIndex: cowData.assetId,
       manager: adminAddress,
       reserve: adminAddress,
@@ -332,7 +328,7 @@ export const Web3Service = {
 
     // Step 1: User Opt-In (signed by user via Pera Wallet)
     const optInTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-      from: userAddress,
+      sender: userAddress,
       to: userAddress,
       assetIndex: assetId,
       amount: 0,
@@ -352,7 +348,7 @@ export const Web3Service = {
     const params2 = await algodClient.getTransactionParams().do();
     
     const transferTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-      from: adminAddress,
+      sender: adminAddress,
       to: userAddress,
       assetIndex: assetId,
       amount: 1,
