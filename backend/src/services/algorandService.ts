@@ -37,8 +37,8 @@ export const fundNewWallet = async (targetAddress: string) => {
   
   // Fund with 1 ALGO (1,000,000 microAlgos) for opt-ins and basic txns
   const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    sender: masterAccount.addr.toString(),
-    receiver: targetAddress,
+    from: masterAccount.addr.toString(),
+    to: targetAddress,
     amount: 1000000, 
     suggestedParams: params,
   });
@@ -71,7 +71,7 @@ export const mintCowNFT = async (
   const metadataHash = new Uint8Array(32); // Placeholder hash
 
   const txn = algosdk.makeAssetCreateTxnWithSuggestedParamsFromObject({
-    sender: ownerAccount.addr.toString(),
+    from: ownerAccount.addr.toString(),
     total: 1,
     decimals: 0,
     assetName: `COW-${metadata.name}`,
@@ -105,8 +105,8 @@ export const optInToAsset = async (
 
   // Opt-in is a 0 amount transfer to self
   const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-    sender: account.addr.toString(),
-    receiver: account.addr.toString(),
+    from: account.addr.toString(),
+    to: account.addr.toString(),
     assetIndex: assetId,
     amount: 0,
     suggestedParams: params,
@@ -129,8 +129,8 @@ export const transferAsset = async (
   const params = await algodClient.getTransactionParams().do();
 
   const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-    sender: fromAccount.addr.toString(),
-    receiver: toAddress,
+    from: fromAccount.addr.toString(),
+    to: toAddress,
     assetIndex: assetId,
     amount: 1,
     suggestedParams: params,
