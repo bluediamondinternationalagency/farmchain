@@ -1,0 +1,14 @@
+# Git ignore file for backend
+node_modules/
+.env
+.env.local
+dist/
+build/
+*.log
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
+coverage/
+.nyc_output/

@@ -175,8 +175,8 @@ export const Web3Service = {
       const response = await algodClient.sendRawTransaction(signedTxn).do();
       console.log('Raw response:', response);
       
-      // The response is just the txId string
-      const txId = typeof response === 'string' ? response : response.txId || response.txid;
+      // The response is just the txid string
+      const txId = typeof response === 'string' ? response : response.txid;
       
       if (!txId) {
         console.error('Invalid response format:', response);
@@ -194,8 +194,6 @@ export const Web3Service = {
       const assetIndex = result['asset-index'] || 
                          result.assetIndex || 
                          result['created-asset-index'] ||
-                         result.createdAssetIndex ||
-                         (result.txn?.txn?.caid) ||
                          (result['txn']?.['txn']?.['caid']);
       
       if (!assetIndex) {
@@ -266,7 +264,7 @@ export const Web3Service = {
 
     const signedTxn = txn.signTxn(admin.sk);
     const response = await algodClient.sendRawTransaction(signedTxn).do();
-    const txId = typeof response === 'string' ? response : response.txId || response.txid;
+    const txId = typeof response === 'string' ? response : response.txid;
     
     if (!txId) throw new Error('Failed to get transaction ID for update');
     
@@ -294,7 +292,7 @@ export const Web3Service = {
         for (const txn of txns.transactions) {
           if (txn.note) {
             try {
-              const noteText = Buffer.from(txn.note, 'base64').toString('utf-8');
+              const noteText = Buffer.from(txn.note as any, 'base64').toString('utf-8');
               const metadata = JSON.parse(noteText);
               if (metadata.standard === 'arc69') {
                 latestMetadata = metadata;
@@ -329,7 +327,7 @@ export const Web3Service = {
     // Step 1: User Opt-In (signed by user via Pera Wallet)
     const optInTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
       sender: userAddress,
-      to: userAddress,
+      receiver: userAddress,
       assetIndex: assetId,
       amount: 0,
       suggestedParams: params,
@@ -337,7 +335,7 @@ export const Web3Service = {
     
     const signedOptIn = await PeraWalletService.signTransaction(optInTxn, userAddress);
     const optInRes = await algodClient.sendRawTransaction(signedOptIn).do();
-    const optInTxId = typeof optInRes === 'string' ? optInRes : optInRes.txId || optInRes.txid;
+    const optInTxId = typeof optInRes === 'string' ? optInRes : optInRes.txid;
     
     if (!optInTxId) throw new Error('Failed to get opt-in transaction ID');
     
@@ -349,7 +347,7 @@ export const Web3Service = {
     
     const transferTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
       sender: adminAddress,
-      to: userAddress,
+      receiver: userAddress,
       assetIndex: assetId,
       amount: 1,
       suggestedParams: params2,
@@ -357,7 +355,7 @@ export const Web3Service = {
 
     const signedTransfer = transferTxn.signTxn(admin.sk);
     const transferRes = await algodClient.sendRawTransaction(signedTransfer).do();
-    const transferTxId = typeof transferRes === 'string' ? transferRes : transferRes.txId || transferRes.txid;
+    const transferTxId = typeof transferRes === 'string' ? transferRes : transferRes.txid;
     
     if (!transferTxId) throw new Error('Failed to get transfer transaction ID');
     
