@@ -8,6 +8,8 @@ import { Marketplace } from './components/Marketplace';
 import { CowDetails } from './components/CowDetails';
 import { AdminDashboard } from './components/AdminDashboard';
 import { VerifyPage } from './components/VerifyPage';
+import { ToastContainer, useToast } from './components/Toast';
+import { TransactionStatus, useTransactions } from './components/TransactionStatus';
 import { Web3Service } from './services/web3Service';
 import { EscrowService } from './services/escrowService';
 import { IPFSService } from './services/ipfsService';
@@ -71,6 +73,10 @@ const App: React.FC = () => {
   // Lifted state: Single source of truth for all cows on "chain"
   const [allCows, setAllCows] = useState<Cow[]>(INITIAL_DB);
   const [selectedCow, setSelectedCow] = useState<Cow | null>(null);
+
+  // Toast and Transaction hooks
+  const { toasts, toast, removeToast } = useToast();
+  const { transactions, addTransaction, updateTransaction, removeTransaction } = useTransactions();
 
   // Debug logging
   useEffect(() => {
@@ -152,7 +158,7 @@ const App: React.FC = () => {
         }
       } catch (e) {
         console.error('Pera Wallet connection failed:', e);
-        alert('Failed to connect Pera Wallet. Please make sure you have Pera Wallet installed.');
+        toast.error('Connection Failed', 'Please make sure you have Pera Wallet installed.');
       } finally {
         setAuthLoading(false);
       }
@@ -188,36 +194,45 @@ const App: React.FC = () => {
   const handleSellCow = (cowToSell: Cow) => {
     setAllCows(prev => prev.filter(c => c.id !== cowToSell.id));
     setView(AppView.DASHBOARD);
-    alert(`Sold ${cowToSell.name}. Funds returning to wallet...`);
+    toast.success('Cattle Sold', `${cowToSell.name} has been sold. Funds returning to wallet...`);
   };
 
   const handleMintCow = async (newCow: Cow) => {
+    const txId = addTransaction(`Minting NFT for ${newCow.name}`);
     try {
+      updateTransaction(txId, { state: 'confirming' });
       // Real Blockchain Interaction
       const assetId = await Web3Service.mintCowNFT(newCow);
       
       const mintedCow = { ...newCow, assetId };
       setAllCows(prev => [...prev, mintedCow]);
+      updateTransaction(txId, { state: 'confirmed', txId: assetId?.toString() });
+      toast.success('NFT Minted', `${newCow.name} has been minted successfully!`);
       return true;
     } catch (e: any) {
       console.error(e);
-      alert(`Minting Failed: ${e.message}. Ensure Admin wallet is funded!`);
+      updateTransaction(txId, { state: 'failed', error: e.message });
+      toast.error('Minting Failed', e.message || 'Ensure Admin wallet is funded!');
       return false;
     }
   };
 
   const handleAssignCow = async (cowId: string, address: string) => {
+    const cow = allCows.find(c => c.id === cowId);
+    if (!cow || !cow.assetId) {
+      toast.warning('Assignment Failed', 'Asset not minted on chain yet.');
+      return;
+    }
+    
+    const txId = addTransaction(`Assigning ${cow.name} to user`);
     try {
-      const cow = allCows.find(c => c.id === cowId);
-      if (!cow || !cow.assetId) {
-        alert("Cannot assign: Asset not minted on chain yet.");
-        return;
-      }
-      
+      updateTransaction(txId, { state: 'confirming' });
       // Real Blockchain Transfer (OptIn + Send)
       await Web3Service.assignAssetToUser(cow.assetId, address);
       
       setAllCows(prev => prev.map(c => c.id === cowId ? { ...c, ownerAddress: address } : c));
+      updateTransaction(txId, { state: 'confirmed' });
+      toast.success('Assignment Complete', `${cow.name} assigned successfully!`);
       
       // Refresh user balance if it was the current user
       if (wallet.address === address) {
@@ -225,7 +240,8 @@ const App: React.FC = () => {
       }
     } catch (e: any) {
       console.error(e);
-      alert(`Assignment Failed: ${e.message}. Ensure User wallet has funds for Opt-In!`);
+      updateTransaction(txId, { state: 'failed', error: e.message });
+      toast.error('Assignment Failed', e.message || 'Ensure User wallet has funds for Opt-In!');
     }
   };
 
@@ -234,16 +250,20 @@ const App: React.FC = () => {
   };
 
   const handleSlaughterCattle = async (cow: Cow, slaughterInfo: SlaughterInfo) => {
-    try {
-      if (!cow.ownerAddress) {
-        alert('Cannot slaughter: Cattle has no owner.');
-        return;
-      }
+    if (!cow.ownerAddress) {
+      toast.warning('Cannot Process', 'Cattle has no owner.');
+      return;
+    }
 
-      if (!cow.assetId) {
-        alert('Cannot slaughter: Cattle not minted on blockchain.');
-        return;
-      }
+    if (!cow.assetId) {
+      toast.warning('Cannot Process', 'Cattle not minted on blockchain.');
+      return;
+    }
+
+    const txId = addTransaction(`Processing slaughter for ${cow.name}`);
+    
+    try {
+      updateTransaction(txId, { state: 'confirming' });
 
       // Get admin account
       const adminAccountInfo = Web3Service.getAdminAccount();
@@ -354,17 +374,18 @@ const App: React.FC = () => {
 
       setAllCows(prev => prev.map(c => c.id === cow.id ? updatedCow : c));
 
-      alert(
-        `✅ Slaughter processed successfully!\n\n` +
-        `Payment Split: ${splitConfig.farmerPercentage}/${splitConfig.platformPercentage}\n` +
-        `Farmer: ${(paymentResult.farmerAmount / 1000000).toFixed(2)} ALGO\n` +
-        `Platform: ${(paymentResult.platformAmount / 1000000).toFixed(2)} ALGO\n\n` +
-        `Certificate: ipfs://${certificateCID}\n` +
-        `On-chain TxID: ${eventTxId}`
+      updateTransaction(txId, { state: 'confirmed', txId: eventTxId });
+      toast.success(
+        'Slaughter Processed Successfully',
+        `Payment Split: ${splitConfig.farmerPercentage}/${splitConfig.platformPercentage} | ` +
+        `Farmer: ${(paymentResult.farmerAmount / 1000000).toFixed(2)} ALGO | ` +
+        `Platform: ${(paymentResult.platformAmount / 1000000).toFixed(2)} ALGO`,
+        10000
       );
     } catch (e: any) {
       console.error('Slaughter failed:', e);
-      alert(`Slaughter Failed: ${e.message}`);
+      updateTransaction(txId, { state: 'failed', error: e.message });
+      toast.error('Slaughter Failed', e.message || 'An error occurred during processing.');
     }
   };
 
@@ -383,6 +404,8 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-emerald-100">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <TransactionStatus transactions={transactions} onDismiss={removeTransaction} />
       <div className={`mx-auto bg-white min-h-screen transition-all duration-300 relative ${view === AppView.ADMIN ? 'max-w-7xl shadow-xl' : 'max-w-md md:max-w-2xl lg:max-w-4xl md:shadow-2xl'}`}>
         
         {/* Header */}

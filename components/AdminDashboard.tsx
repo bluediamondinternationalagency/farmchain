@@ -4,6 +4,8 @@ import { Plus, UserPlus, FileText, Database, ShieldCheck, ChevronRight, Search, 
 import { Web3Service } from '../services/web3Service';
 import { AdminSettings } from './AdminSettings';
 import { SlaughterModal } from './SlaughterModal';
+import { ImageUpload } from './ImageUpload';
+import { useToast } from './Toast';
 
 interface Props {
   allCows: Cow[];
@@ -16,6 +18,9 @@ interface Props {
 export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCow, onDeleteCow, onSlaughterCattle }) => {
   const [activeTab, setActiveTab] = useState<'mint' | 'inventory' | 'wallet'>('inventory');
   const [inventoryFilter, setInventoryFilter] = useState<'all' | 'assigned' | 'unassigned' | 'slaughtered'>('all');
+  
+  // Toast hook
+  const { toast } = useToast();
   
   // Settings & Slaughter Modal State
   const [showSettings, setShowSettings] = useState(false);
@@ -73,23 +78,23 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
     
     // Validate breed selection
     if (!formData.breed) {
-      alert("Please select a breed");
+      toast.warning('Validation Error', 'Please select a breed');
       return;
     }
     
     if (formData.breed === 'custom' && !formData.customBreed.trim()) {
-      alert("Please enter a custom breed name");
+      toast.warning('Validation Error', 'Please enter a custom breed name');
       return;
     }
     
     // Check balance
     if (adminBalance === null) {
-      alert("Checking wallet balance... Please wait a moment and try again.");
+      toast.warning('Please Wait', 'Checking wallet balance... Please wait a moment and try again.');
       return;
     }
     
     if (adminBalance < 0.2) {
-      alert(`Admin Wallet needs at least 0.2 ALGO to mint! Current balance: ${adminBalance.toFixed(4)} ALGO\n\nPlease fund it via the dispenser link.`);
+      toast.error('Insufficient Balance', `Admin Wallet needs at least 0.2 ALGO to mint! Current balance: ${adminBalance.toFixed(4)} ALGO. Please fund it via the dispenser link.`);
       return;
     }
     
@@ -124,14 +129,17 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
     setIsMinting(false);
     
     if (success) {
-      alert(`Minted Cow successfully! Check inventory.`);
+      toast.success('Minting Complete', 'Cattle NFT minted successfully! Check inventory.');
       setFormData({ ...formData, name: '', imageCID: '', metadataCID: '', cattleType: 'standard' });
       setActiveTab('inventory');
     }
   };
 
   const handleAssign = async () => {
-    if(!selectedCowId || !assignAddress) return alert('Enter address');
+    if(!selectedCowId || !assignAddress) {
+      toast.warning('Missing Information', 'Please enter an address');
+      return;
+    }
     
     setIsAssigning(true);
     await onAssignCow(selectedCowId, assignAddress);
@@ -139,7 +147,7 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
     
     setAssignAddress('');
     setSelectedCowId(null);
-    alert(`Assigned successfully!`);
+    toast.success('Assignment Complete', 'Cattle assigned successfully!');
   };
 
   const handleSetMnemonic = () => {
@@ -150,9 +158,9 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
       setShowMnemonicInput(false);
       setAdminBalance(null);
       Web3Service.getBalance(newAccount.address).then(setAdminBalance);
-      alert('Admin wallet updated successfully!');
+      toast.success('Account Updated', 'Admin wallet updated successfully!');
     } catch (e: any) {
-      alert(e.message);
+      toast.error('Invalid Mnemonic', e.message || 'Please check your mnemonic phrase');
     }
   };
 
@@ -495,6 +503,25 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
                       <strong>💡 Tip:</strong> Upload to Pinata first, then paste CIDs here. Dynamic updates will be stored on-chain via ARC-69.
                     </p>
                   </div>
+                </div>
+
+                {/* Image Upload to IPFS */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Upload Image to IPFS</label>
+                  <ImageUpload 
+                    onUploadComplete={(url, cid) => {
+                      setFormData({...formData, imageUrl: url, imageCID: cid});
+                      toast.success('Image Uploaded', `Uploaded to IPFS: ${cid}`);
+                    }}
+                    onUploadError={(error) => {
+                      toast.error('Upload Failed', error);
+                    }}
+                  />
+                  {formData.imageCID && (
+                    <div className="mt-2 p-2 bg-emerald-50 rounded-lg">
+                      <p className="text-xs text-emerald-700 font-mono">CID: {formData.imageCID}</p>
+                    </div>
+                  )}
                 </div>
 
                 <div>

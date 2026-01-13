@@ -1,6 +1,7 @@
 import React from 'react';
 import { Cow } from '../types';
 import { CowCard } from './CowCard';
+import { DashboardAnalytics } from './DashboardAnalytics';
 import { PlusCircle } from 'lucide-react';
 
 interface Props {
@@ -20,6 +21,9 @@ export const Dashboard: React.FC<Props> = ({ cows, onCowClick, onNavigateToMarke
           </p>
         </div>
       )}
+
+      {/* Analytics Dashboard */}
+      <DashboardAnalytics cows={cows} />
       
       <div className="flex justify-between items-end">
         <div>
