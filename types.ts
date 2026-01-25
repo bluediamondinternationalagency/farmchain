@@ -1,8 +1,17 @@
+export interface VaccinationRecord {
+  date: string;
+  vaccine: string;
+  batch?: string;
+  veterinarian?: string;
+  notes?: string;
+}
+
 export interface Cow {
   id: string;
   assetId?: number; // Real Algorand Asset ID
   name: string;
   breed: string;
+  sex?: 'male' | 'female'; // Added for tracking
   cattleType?: string; // For payment split configuration
   weight: number; // in kg
   purchasePrice: number; // in ALGO
@@ -14,6 +23,7 @@ export interface Cow {
   status: 'fattening' | 'ready_for_sale' | 'sold' | 'slaughtered';
   healthScore: number; // 0-100
   ownerAddress?: string | null; // Null if in marketplace/admin inventory, set if owned
+  vaccination_records?: VaccinationRecord[]; // Vaccination history
   history: {
     date: number;
     weight: number;

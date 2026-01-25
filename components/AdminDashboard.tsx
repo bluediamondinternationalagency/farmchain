@@ -5,6 +5,7 @@ import { Web3Service } from '../services/web3Service';
 import { AdminSettings } from './AdminSettings';
 import { SlaughterModal } from './SlaughterModal';
 import { ImageUpload } from './ImageUpload';
+import { LivestockManagementTab } from './LivestockManagementTab';
 import { useToast } from './Toast';
 
 interface Props {
@@ -13,10 +14,13 @@ interface Props {
   onAssignCow: (cowId: string, address: string) => Promise<void>;
   onDeleteCow: (cowId: string) => void;
   onSlaughterCattle: (cow: Cow, slaughterInfo: SlaughterInfo) => Promise<void>;
+  onUpdateCow: (updatedCow: Cow) => void;
+  walletAddress: string | null;
+  walletBalance: number;
 }
 
-export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCow, onDeleteCow, onSlaughterCattle }) => {
-  const [activeTab, setActiveTab] = useState<'mint' | 'inventory' | 'wallet'>('inventory');
+export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCow, onDeleteCow, onSlaughterCattle, onUpdateCow, walletAddress, walletBalance }) => {
+  const [activeTab, setActiveTab] = useState<'mint' | 'inventory' | 'livestock' | 'wallet'>('livestock');
   const [inventoryFilter, setInventoryFilter] = useState<'all' | 'assigned' | 'unassigned' | 'slaughtered'>('all');
   
   // Toast hook
@@ -27,16 +31,13 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
   const [showSlaughterModal, setShowSlaughterModal] = useState(false);
   const [selectedCowForSlaughter, setSelectedCowForSlaughter] = useState<Cow | null>(null);
   const [paymentSplitConfigs, setPaymentSplitConfigs] = useState<PaymentSplitConfig[]>([]);
-  
-  // Admin Wallet Info
-  const [adminAccount, setAdminAccount] = useState(Web3Service.getAdminAccount());
-  const [adminBalance, setAdminBalance] = useState<number | null>(null);
-  const [showMnemonicInput, setShowMnemonicInput] = useState(false);
-  const [mnemonicInput, setMnemonicInput] = useState('');
 
   useEffect(() => {
-    Web3Service.getBalance(adminAccount.address).then(setAdminBalance);
-  }, [adminAccount.address, activeTab]);
+    if (walletAddress) {
+      console.log('🛡️ Admin Pera Wallet:', walletAddress);
+      console.log('💰 Balance:', walletBalance.toFixed(4), 'ALGO');
+    }
+  }, [walletAddress, walletBalance, activeTab]);
 
   // Load payment split configurations
   useEffect(() => {
@@ -59,6 +60,7 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
     species: 'cattle',
     breed: '',
     customBreed: '',
+    sex: 'female' as 'male' | 'female',
     weight: 400,
     price: 5, // Default 5 ALGO for TestNet (reasonable for demo)
     expectedReturn: 10,
@@ -87,14 +89,20 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
       return;
     }
     
-    // Check balance
-    if (adminBalance === null) {
-      toast.warning('Please Wait', 'Checking wallet balance... Please wait a moment and try again.');
+    // Check wallet connection and balance
+    if (!walletAddress) {
+      toast.error('Wallet Not Connected', 'Please connect your Pera Wallet to mint NFTs.');
       return;
     }
     
-    if (adminBalance < 0.2) {
-      toast.error('Insufficient Balance', `Admin Wallet needs at least 0.2 ALGO to mint! Current balance: ${adminBalance.toFixed(4)} ALGO. Please fund it via the dispenser link.`);
+    if (walletBalance < 0.2) {
+      console.error('❌ Insufficient wallet balance!');
+      console.error('📍 Your address:', walletAddress);
+      console.error('🔗 Fund at: https://bank.testnet.algorand.network/');
+      toast.error(
+        'Insufficient Balance', 
+        `Your Pera Wallet needs at least 0.2 ALGO to mint! Current: ${walletBalance.toFixed(4)} ALGO.\n\nFund at: https://bank.testnet.algorand.network/`
+      );
       return;
     }
     
@@ -106,6 +114,7 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
       id: Math.random().toString(36).substring(2, 9).toUpperCase(),
       name: formData.name,
       breed: finalBreed,
+      sex: formData.sex,
       weight: Number(formData.weight),
       purchasePrice: Number(formData.price),
       purchaseDate: Date.now(),
@@ -117,6 +126,7 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
       status: 'fattening',
       healthScore: 100,
       ownerAddress: null, // Unassigned initially
+      vaccination_records: [],
       supplyChain: [],
       history: [{
         date: Date.now(),
@@ -150,31 +160,6 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
     toast.success('Assignment Complete', 'Cattle assigned successfully!');
   };
 
-  const handleSetMnemonic = () => {
-    try {
-      const newAccount = Web3Service.setAdminMnemonic(mnemonicInput.trim());
-      setAdminAccount(newAccount);
-      setMnemonicInput('');
-      setShowMnemonicInput(false);
-      setAdminBalance(null);
-      Web3Service.getBalance(newAccount.address).then(setAdminBalance);
-      toast.success('Account Updated', 'Admin wallet updated successfully!');
-    } catch (e: any) {
-      toast.error('Invalid Mnemonic', e.message || 'Please check your mnemonic phrase');
-    }
-  };
-
-  const handleGenerateNew = () => {
-    if (confirm('Are you sure you want to generate a new admin wallet? The current one will be lost!')) {
-      Web3Service.clearAdminWallet();
-      const newAccount = Web3Service.getAdminAccount();
-      setAdminAccount(newAccount);
-      setAdminBalance(null);
-      Web3Service.getBalance(newAccount.address).then(setAdminBalance);
-      alert('New admin wallet generated!');
-    }
-  };
-
   const unassignedCows = allCows.filter(c => !c.ownerAddress);
 
   // Filter cows based on selected filter
@@ -203,24 +188,34 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
              <h2 className="text-3xl font-bold tracking-tight">Admin Console</h2>
            </div>
            <p className="text-slate-400">Nerve Venture • Algorand Network Manager</p>
-           <div className="mt-2 text-xs text-slate-500 font-mono flex items-center gap-2">
-             Admin Addr: {adminAccount.address.substring(0,8)}...{adminAccount.address.substring(50)} 
-             <span className={`ml-2 font-bold ${(adminBalance || 0) < 0.2 ? 'text-amber-400' : 'text-emerald-400'}`}>
-               ({adminBalance !== null ? adminBalance.toFixed(4) : 'loading...'} ALGO)
-             </span>
-             <button 
-               onClick={() => Web3Service.getBalance(adminAccount.address).then(setAdminBalance)}
-               className="text-emerald-400 hover:text-emerald-300 text-xs"
-               title="Refresh balance"
-             >
-               ↻
-             </button>
+           <div className="mt-2 text-xs text-slate-500 flex flex-col gap-1">
+             <div className="flex items-center gap-2">
+               <span className="text-slate-600">🔒 Authorized Admin Access</span>
+               <span className="text-emerald-400 font-semibold">Active</span>
+             </div>
+             <div className="text-slate-400">
+               All minting transactions signed by your connected Pera Wallet
+             </div>
+             {walletAddress && (
+               <div className="mt-1 font-mono text-[10px] text-slate-600 flex items-center gap-2">
+                 <span>Your Wallet:</span>
+                 <span className="text-emerald-300">{walletAddress.substring(0, 6)}...{walletAddress.substring(52)}</span>
+                 <span className={`font-bold ${walletBalance < 0.2 ? 'text-red-400' : 'text-emerald-400'}`}>
+                   ({walletBalance.toFixed(2)} ALGO)
+                 </span>
+               </div>
+             )}
+             {walletAddress && walletBalance < 0.2 && (
+               <a 
+                 href={`https://bank.testnet.algorand.network/?account=${walletAddress}`}
+                 target="_blank"
+                 rel="noreferrer"
+                 className="text-amber-400 text-[10px] hover:text-amber-300 underline"
+               >
+                 ⚠️ Fund Your Pera Wallet (Need 0.2+ ALGO)
+               </a>
+             )}
            </div>
-           {(adminBalance !== null && adminBalance < 0.2) && (
-              <a href={`https://bank.testnet.algorand.network/?account=${adminAccount.address}`} target="_blank" rel="noreferrer" className="text-amber-400 text-xs underline mt-1 block hover:text-amber-300">
-                ⚠️ Fund Admin Wallet (Need 0.2+ ALGO for Minting)
-              </a>
-           )}
         </div>
         <div className="mt-4 md:mt-0 flex gap-3">
           <button
@@ -252,6 +247,15 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
                <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide">Menu</h3>
              </div>
              <nav className="p-2 space-y-1">
+               <button 
+                 onClick={() => setActiveTab('livestock')}
+                 className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors ${activeTab === 'livestock' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}
+               >
+                 <div className="flex items-center gap-3">
+                   <FileText size={18} /> All Livestock
+                 </div>
+                 <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-bold">{allCows.length}</span>
+               </button>
                <button 
                  onClick={() => setActiveTab('inventory')}
                  className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors ${activeTab === 'inventory' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}
@@ -416,6 +420,19 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
                       />
                     </div>
                   )}
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Sex</label>
+                    <select 
+                      value={formData.sex}
+                      onChange={e => setFormData({...formData, sex: e.target.value as 'male' | 'female'})}
+                      className="w-full p-3 border border-slate-300 rounded-lg outline-none bg-white"
+                    >
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Cattle Type</label>
                     <select 
@@ -547,6 +564,19 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
                 </div>
               </form>
             </div>
+          )}
+
+          {activeTab === 'livestock' && (
+            <LivestockManagementTab
+              allCows={allCows}
+              onUpdateCow={onUpdateCow}
+              onSlaughterCattle={(cow) => {
+                setSelectedCowForSlaughter(cow);
+                setShowSlaughterModal(true);
+              }}
+              walletAddress={walletAddress}
+              toast={toast}
+            />
           )}
 
           {activeTab === 'inventory' && (
@@ -741,119 +771,91 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
           {activeTab === 'wallet' && (
             <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm max-w-3xl">
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-                <h3 className="text-xl font-bold text-slate-800">Admin Wallet Settings</h3>
+                <h3 className="text-xl font-bold text-slate-800">Connected Wallet Info</h3>
                 <ShieldCheck className="text-indigo-600" size={24} />
               </div>
 
               <div className="space-y-6">
-                {/* Current Wallet Info */}
-                <div className="bg-slate-50 p-6 rounded-lg border border-slate-200">
-                  <h4 className="font-semibold text-slate-700 mb-3">Current Admin Wallet</h4>
-                  <div className="space-y-2">
+                {/* Wallet Info */}
+                <div className="bg-gradient-to-br from-indigo-50 to-emerald-50 p-6 rounded-lg border border-indigo-100">
+                  <h4 className="font-semibold text-indigo-900 mb-3 flex items-center gap-2">
+                    <span>🔒</span>
+                    <span>Your Pera Wallet (Admin)</span>
+                  </h4>
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-600">Address:</span>
-                      <code className="text-xs bg-white px-2 py-1 rounded border border-slate-200 font-mono">
-                        {adminAccount.address.substring(0, 10)}...{adminAccount.address.substring(50)}
+                      <code className="text-xs bg-white px-3 py-2 rounded border border-indigo-200 font-mono text-indigo-700">
+                        {walletAddress ? `${walletAddress.substring(0, 10)}...${walletAddress.substring(50)}` : 'Not connected'}
                       </code>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-600">Balance:</span>
-                      <span className={`font-bold ${(adminBalance || 0) < 0.5 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                        {adminBalance !== null ? adminBalance.toFixed(4) : '...'} ALGO
+                      <span className={`font-bold text-lg ${walletBalance < 0.2 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {walletBalance.toFixed(4)} ALGO
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600">Status:</span>
+                      <span className="flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span className="text-sm font-semibold text-emerald-600">Connected</span>
                       </span>
                     </div>
                   </div>
-                  {(adminBalance || 0) < 0.5 && (
+                </div>
+
+                {/* Minting Info */}
+                <div className="border border-blue-200 rounded-lg p-6 bg-blue-50">
+                  <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                    <span>ℹ️</span>
+                    <span>How Minting Works</span>
+                  </h4>
+                  <ul className="text-sm text-blue-800 space-y-2 ml-5 list-disc">
+                    <li>All NFTs are minted using <strong>your connected Pera Wallet</strong></li>
+                    <li>Each mint costs approximately <strong>0.2 ALGO</strong> in transaction fees</li>
+                    <li>You'll approve each transaction in your Pera Wallet app</li>
+                    <li>Your wallet must remain connected to mint NFTs</li>
+                    <li>Funds are deducted from your Pera Wallet balance</li>
+                  </ul>
+                </div>
+
+                {/* Fund Wallet */}
+                {walletBalance < 0.5 && walletAddress && (
+                  <div className="border border-amber-300 rounded-lg p-6 bg-amber-50">
+                    <h4 className="font-semibold text-amber-900 mb-2 flex items-center gap-2">
+                      <span>⚠️</span>
+                      <span>Low Balance Warning</span>
+                    </h4>
+                    <p className="text-sm text-amber-800 mb-4">
+                      Your wallet balance is low. You need at least 0.2 ALGO per NFT mint.
+                    </p>
                     <a 
-                      href={`https://bank.testnet.algorand.network/?account=${adminAccount.address}`}
+                      href={`https://bank.testnet.algorand.network/?account=${walletAddress}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-3 block text-center bg-amber-50 text-amber-700 border border-amber-200 px-4 py-2 rounded-lg hover:bg-amber-100 transition-colors text-sm font-medium"
+                      className="inline-block bg-amber-600 text-white px-6 py-2 rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
                     >
-                      Fund This Wallet (TestNet Dispenser)
+                      Fund Wallet (TestNet Dispenser)
                     </a>
-                  )}
-                </div>
-
-                {/* Import Existing Wallet */}
-                <div className="border border-slate-200 rounded-lg p-6">
-                  <h4 className="font-semibold text-slate-700 mb-2">Import Funded Wallet</h4>
-                  <p className="text-sm text-slate-600 mb-4">
-                    If you already have a funded TestNet wallet, you can import it using your 25-word mnemonic phrase.
-                  </p>
-                  
-                  {!showMnemonicInput ? (
-                    <button
-                      onClick={() => setShowMnemonicInput(true)}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
-                    >
-                      Import Existing Wallet
-                    </button>
-                  ) : (
-                    <div className="space-y-3">
-                      <textarea
-                        value={mnemonicInput}
-                        onChange={(e) => setMnemonicInput(e.target.value)}
-                        placeholder="Enter your 25-word mnemonic phrase..."
-                        className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
-                        rows={3}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSetMnemonic}
-                          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
-                        >
-                          Import Wallet
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowMnemonicInput(false);
-                            setMnemonicInput('');
-                          }}
-                          className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        ⚠️ Your mnemonic will be stored in browser localStorage. Keep it safe!
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Generate New Wallet */}
-                <div className="border border-rose-200 rounded-lg p-6 bg-rose-50">
-                  <h4 className="font-semibold text-rose-800 mb-2">Generate New Wallet</h4>
-                  <p className="text-sm text-rose-700 mb-4">
-                    ⚠️ This will replace your current admin wallet. Make sure you have backed up the mnemonic if needed!
-                  </p>
-                  <button
-                    onClick={handleGenerateNew}
-                    className="bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700 transition-colors text-sm font-medium"
-                  >
-                    Generate New Admin Wallet
-                  </button>
-                </div>
-
-                {/* View Mnemonic */}
-                <div className="border border-slate-200 rounded-lg p-6">
-                  <h4 className="font-semibold text-slate-700 mb-2">Backup Mnemonic</h4>
-                  <p className="text-sm text-slate-600 mb-3">
-                    Your recovery phrase (keep this safe and private!):
-                  </p>
-                  <div className="bg-slate-900 text-emerald-400 p-4 rounded-lg font-mono text-xs break-all">
-                    {adminAccount.mnemonic}
                   </div>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(adminAccount.mnemonic);
-                      alert('Mnemonic copied to clipboard!');
-                    }}
-                    className="mt-3 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium"
-                  >
-                    Copy to Clipboard
-                  </button>
+                )}
+
+                {/* Security Note */}
+                <div className="border border-slate-200 rounded-lg p-6 bg-slate-50">
+                  <h4 className="font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                    <span>🔐</span>
+                    <span>Security & Authorization</span>
+                  </h4>
+                  <ul className="text-sm text-slate-600 space-y-2 ml-5 list-disc">
+                    <li>Only whitelisted Pera Wallet addresses can access this admin panel</li>
+                    <li>Your wallet keys are controlled by <strong>Pera Wallet</strong>, not this app</li>
+                    <li>This is a non-custodial solution - you always control your funds</li>
+                    <li>Whitelist is configured in <code className="bg-slate-200 px-1 py-0.5 rounded text-xs">.env.local</code></li>
+                  </ul>
                 </div>
               </div>
             </div>

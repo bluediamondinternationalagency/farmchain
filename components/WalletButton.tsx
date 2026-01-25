@@ -12,6 +12,15 @@ export const WalletButton: React.FC<Props> = ({ wallet, onConnect, loading }) =>
   const needsFunding = wallet.isConnected && wallet.balance < 0.5;
   const isPeraWallet = wallet.walletType === 'pera';
 
+  // Debug logging
+  React.useEffect(() => {
+    if (wallet.isConnected && wallet.address) {
+      console.log('🔍 WalletButton - Displaying address:', wallet.address);
+      console.log('🔍 First 4 chars:', wallet.address.substring(0, 4));
+      console.log('🔍 Last 4 chars:', wallet.address.substring(wallet.address.length - 4));
+    }
+  }, [wallet.address, wallet.isConnected]);
+
   const copyAddress = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (wallet.address) {

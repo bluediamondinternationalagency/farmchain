@@ -83,18 +83,22 @@ export const Web3Service = {
 
   // --- Asset Management (Minting) ---
 
-  mintCowNFT: async (cowData: Cow): Promise<number> => {
-    const admin = getOrCreateAccount(ADMIN_KEY);
-    // admin.addr is an Address object with a toString() method
-    const adminAddress = admin.addr.toString();
-    
-    console.log('Minting NFT with admin address:', adminAddress);
-    console.log('Admin address type:', typeof adminAddress);
+  mintCowNFT: async (cowData: Cow, signerAddress: string): Promise<number> => {
+    console.log('🔨 Minting NFT with Pera Wallet:', signerAddress);
+    console.log('💰 Checking wallet balance...');
     
     // Check balance first
-    const balance = await Web3Service.getBalance(adminAddress);
+    const balance = await Web3Service.getBalance(signerAddress);
+    console.log(`💰 Wallet balance: ${balance.toFixed(4)} ALGO`);
+    
     if (balance < 0.2) {
-      throw new Error(`Insufficient balance: ${balance.toFixed(4)} ALGO. Need at least 0.2 ALGO to mint.`);
+      console.error('❌ Insufficient balance for minting!');
+      console.error(`📍 Fund your Pera Wallet: ${signerAddress}`);
+      console.error('🔗 Dispenser: https://bank.testnet.algorand.network/');
+      throw new Error(
+        `Insufficient balance: ${balance.toFixed(4)} ALGO. Need at least 0.2 ALGO to mint.\n\n` +
+        `Fund your Pera Wallet at: https://bank.testnet.algorand.network/`
+      );
     }
     
     const params = await algodClient.getTransactionParams().do();
@@ -122,10 +126,12 @@ export const Web3Service = {
       external_url: "https://farmchain.app",
       properties: {
         breed: cowData.breed,
+        sex: cowData.sex || 'female',
         weight: cowData.weight,
         health_score: cowData.healthScore,
         status: cowData.status,
         purchase_date: cowData.purchaseDate,
+        vaccination_records: cowData.vaccination_records || [],
         last_updated: Date.now()
       }
     };
@@ -145,9 +151,9 @@ export const Web3Service = {
 
     // Debug logging
     console.log('Transaction parameters:', {
-      from: adminAddress,
-      manager: adminAddress,
-      reserve: adminAddress,
+      from: signerAddress,
+      manager: signerAddress,
+      reserve: signerAddress,
       assetName: trimmedAssetName,
       assetURL: trimmedAssetURL,
       noteLength: note.length
@@ -155,20 +161,22 @@ export const Web3Service = {
 
     // Create asset creation transaction
     const txn = algosdk.makeAssetCreateTxnWithSuggestedParamsFromObject({
-      sender: adminAddress,
+      sender: signerAddress,
       total: BigInt(1),
       decimals: 0,
       assetName: trimmedAssetName,
       unitName: 'FCLSTK',
       assetURL: trimmedAssetURL,
       defaultFrozen: false,
-      manager: adminAddress,
-      reserve: adminAddress,
+      manager: signerAddress,
+      reserve: signerAddress,
       note: note,
       suggestedParams: params,
     });
 
-    const signedTxn = txn.signTxn(admin.sk);
+    // Sign with Pera Wallet
+    console.log('📝 Requesting signature from Pera Wallet...');
+    const signedTxn = await PeraWalletService.signTransaction(txn, signerAddress);
     
     try {
       console.log('Sending transaction to network...');
@@ -202,7 +210,9 @@ export const Web3Service = {
       }
       
       console.log('Asset minted successfully! Asset ID:', assetIndex);
-      return assetIndex;
+      // Convert BigInt to number for storage
+      const assetIdNumber = typeof assetIndex === 'bigint' ? Number(assetIndex) : assetIndex;
+      return assetIdNumber;
     } catch (error: any) {
       console.error('Minting error details:', error);
       
@@ -319,12 +329,22 @@ export const Web3Service = {
   // 1. Opt-In User (User signs via Pera)
   // 2. Transfer Asset (Admin signs - custodial)
 
-  assignAssetToUser: async (assetId: number, userAddress: string) => {
-    const admin = getOrCreateAccount(ADMIN_KEY);
-    const adminAddress = admin.addr.toString();
+  assignAssetToUser: async (assetId: number, userAddress: string, adminWalletAddress: string) => {
+    console.log('📦 Transferring NFT...');
+    console.log('📍 From (Admin):', adminWalletAddress);
+    console.log('📍 To (User):', userAddress);
+    console.log('🎫 Asset ID:', assetId);
+
+    // Check admin wallet balance
+    const adminBalance = await Web3Service.getBalance(adminWalletAddress);
+    if (adminBalance < 0.002) {
+      throw new Error(`Admin wallet needs at least 0.002 ALGO for transfer fees. Current: ${adminBalance.toFixed(4)} ALGO`);
+    }
+
     const params = await algodClient.getTransactionParams().do();
 
     // Step 1: User Opt-In (signed by user via Pera Wallet)
+    console.log('1️⃣ Creating opt-in transaction for user...');
     const optInTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
       sender: userAddress,
       receiver: userAddress,
@@ -333,34 +353,39 @@ export const Web3Service = {
       suggestedParams: params,
     });
     
+    console.log('✍️ Requesting user signature for opt-in...');
     const signedOptIn = await PeraWalletService.signTransaction(optInTxn, userAddress);
     const optInRes = await algodClient.sendRawTransaction(signedOptIn).do();
     const optInTxId = typeof optInRes === 'string' ? optInRes : optInRes.txid;
     
     if (!optInTxId) throw new Error('Failed to get opt-in transaction ID');
     
-    console.log('Opt-in transaction sent. TxID:', optInTxId);
+    console.log('✅ Opt-in transaction sent. TxID:', optInTxId);
     await algosdk.waitForConfirmation(algodClient, optInTxId, 10);
+    console.log('✅ User opted-in successfully');
 
-    // Step 2: Admin Transfer (signed by admin custodial wallet)
+    // Step 2: Admin Transfer (signed by admin's Pera Wallet)
     const params2 = await algodClient.getTransactionParams().do();
     
+    console.log('2️⃣ Creating transfer transaction from admin...');
     const transferTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
-      sender: adminAddress,
+      sender: adminWalletAddress,
       receiver: userAddress,
       assetIndex: assetId,
       amount: 1,
       suggestedParams: params2,
     });
 
-    const signedTransfer = transferTxn.signTxn(admin.sk);
+    console.log('✍️ Requesting admin signature for transfer...');
+    const signedTransfer = await PeraWalletService.signTransaction(transferTxn, adminWalletAddress);
     const transferRes = await algodClient.sendRawTransaction(signedTransfer).do();
     const transferTxId = typeof transferRes === 'string' ? transferRes : transferRes.txid;
     
     if (!transferTxId) throw new Error('Failed to get transfer transaction ID');
     
-    console.log('Transfer transaction sent. TxID:', transferTxId);
+    console.log('✅ Transfer transaction sent. TxID:', transferTxId);
     await algosdk.waitForConfirmation(algodClient, transferTxId, 10);
+    console.log('✅ NFT transferred successfully!');
 
     return true;
   },
@@ -437,5 +462,100 @@ export const Web3Service = {
   // Create ARC-3 metadata
   createARC3Metadata: (cattleData: any) => {
     return IPFSService.createARC3Metadata(cattleData);
+  },
+
+  // --- Update NFT Metadata (ARC-69) ---
+  updateNFTMetadata: async (assetId: number, cowData: Cow, signerAddress: string): Promise<string> => {
+    console.log('📝 Updating NFT metadata for Asset:', assetId);
+    
+    const params = await algodClient.getTransactionParams().do();
+    
+    // Ensure genesisHash is a Uint8Array if it exists
+    if (params.genesisHash && typeof params.genesisHash === 'string') {
+      params.genesisHash = new Uint8Array(Buffer.from(params.genesisHash, 'base64'));
+    }
+
+    // Create updated ARC-69 metadata
+    const arc69Metadata = {
+      standard: "arc69",
+      description: `Farm Chain Livestock - ${cowData.name}`,
+      external_url: "https://farmchain.app",
+      properties: {
+        breed: cowData.breed,
+        sex: cowData.sex || 'female',
+        weight: cowData.weight,
+        health_score: cowData.healthScore,
+        status: cowData.status,
+        purchase_date: cowData.purchaseDate,
+        vaccination_records: cowData.vaccination_records || [],
+        last_updated: Date.now()
+      }
+    };
+    
+    const note = new TextEncoder().encode(JSON.stringify(arc69Metadata));
+    
+    if (note.length > 1024) {
+      throw new Error('Metadata too large. Please reduce description or properties.');
+    }
+
+    // Asset config transaction to update metadata (manager must be the signer)
+    const txn = algosdk.makeAssetConfigTxnWithSuggestedParamsFromObject({
+      sender: signerAddress,
+      assetIndex: assetId,
+      manager: signerAddress,
+      reserve: signerAddress,
+      freeze: undefined,
+      clawback: undefined,
+      note: note,
+      suggestedParams: params,
+      strictEmptyAddressChecking: false
+    });
+
+    console.log('📝 Requesting signature for metadata update...');
+    const signedTxn = await PeraWalletService.signTransaction(txn, signerAddress);
+    
+    const response = await algodClient.sendRawTransaction(signedTxn).do();
+    const txId = typeof response === 'string' ? response : response.txid;
+    
+    console.log('Metadata update transaction sent. TxID:', txId);
+    await algosdk.waitForConfirmation(algodClient, txId, 4);
+    console.log('✅ Metadata updated successfully!');
+    
+    return txId;
+  },
+
+  // --- Burn/Opt-Out NFT (for slaughter or off-chain sales) ---
+  burnNFT: async (assetId: number, ownerAddress: string): Promise<string> => {
+    console.log('🔥 Burning NFT (Opt-Out) - Asset:', assetId);
+    console.log('👤 Owner:', ownerAddress);
+    
+    const params = await algodClient.getTransactionParams().do();
+    
+    // Ensure genesisHash is a Uint8Array
+    if (params.genesisHash && typeof params.genesisHash === 'string') {
+      params.genesisHash = new Uint8Array(Buffer.from(params.genesisHash, 'base64'));
+    }
+
+    // Asset opt-out transaction (removes from wallet, keeps on blockchain)
+    const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+      sender: ownerAddress,
+      receiver: ownerAddress,
+      assetIndex: assetId,
+      amount: BigInt(0),
+      closeRemainderTo: algosdk.encodeAddress(new Uint8Array(32)), // Burn address
+      suggestedParams: params,
+    });
+
+    console.log('📝 Requesting signature for NFT burn...');
+    const signedTxn = await PeraWalletService.signTransaction(txn, ownerAddress);
+    
+    const response = await algodClient.sendRawTransaction(signedTxn).do();
+    const txId = typeof response === 'string' ? response : response.txid;
+    
+    console.log('🔥 NFT burn transaction sent. TxID:', txId);
+    await algosdk.waitForConfirmation(algodClient, txId, 4);
+    console.log('✅ NFT burnt successfully! Asset removed from wallet, history preserved on blockchain.');
+    
+    return txId;
   }
 };

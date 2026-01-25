@@ -25,15 +25,12 @@ export const DashboardAnalytics: React.FC<Props> = ({ cows }) => {
       ? cows.reduce((sum, cow) => sum + (cow.healthScore || 0), 0) / cows.length 
       : 0;
     
-    const readyToSell = cows.filter(cow => {
-      const daysOwned = Math.floor((Date.now() - (cow.purchaseDate || Date.now())) / (1000 * 60 * 60 * 24));
-      return daysOwned >= 90 && cow.status !== 'slaughtered';
-    }).length;
-
+    // Count livestock by actual status
     const statusBreakdown = {
       fattening: cows.filter(c => c.status === 'fattening').length,
+      ready_for_sale: cows.filter(c => c.status === 'ready_for_sale').length,
+      sold: cows.filter(c => c.status === 'sold').length,
       slaughtered: cows.filter(c => c.status === 'slaughtered').length,
-      ready: readyToSell
     };
 
     return {
@@ -43,7 +40,6 @@ export const DashboardAnalytics: React.FC<Props> = ({ cows }) => {
       profitLoss,
       roiPercentage,
       avgHealthScore,
-      readyToSell,
       statusBreakdown
     };
   }, [cows]);
@@ -121,21 +117,32 @@ export const DashboardAnalytics: React.FC<Props> = ({ cows }) => {
       </div>
 
       {/* Secondary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 border border-emerald-200">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-3 h-3 bg-emerald-600 rounded-full"></div>
-            <span className="text-sm font-medium text-emerald-900">Fattening</span>
-          </div>
-          <p className="text-3xl font-bold text-emerald-900">{stats.statusBreakdown.fattening}</p>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-            <span className="text-sm font-medium text-blue-900">Ready to Sell</span>
+            <div className="w-3 h-3 bg-blue-600 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-blue-900">Fattening</span>
           </div>
-          <p className="text-3xl font-bold text-blue-900">{stats.statusBreakdown.ready}</p>
+          <p className="text-3xl font-bold text-blue-900">{stats.statusBreakdown.fattening}</p>
+          <p className="text-xs text-blue-700 mt-1">Currently growing</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-3 h-3 bg-green-600 rounded-full"></div>
+            <span className="text-sm font-medium text-green-900">Ready for Sale</span>
+          </div>
+          <p className="text-3xl font-bold text-green-900">{stats.statusBreakdown.ready_for_sale}</p>
+          <p className="text-xs text-green-700 mt-1">Market ready</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-3 h-3 bg-purple-600 rounded-full"></div>
+            <span className="text-sm font-medium text-purple-900">Sold</span>
+          </div>
+          <p className="text-3xl font-bold text-purple-900">{stats.statusBreakdown.sold}</p>
+          <p className="text-xs text-purple-700 mt-1">Completed sales</p>
         </div>
 
         <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
@@ -144,6 +151,7 @@ export const DashboardAnalytics: React.FC<Props> = ({ cows }) => {
             <span className="text-sm font-medium text-slate-900">Processed</span>
           </div>
           <p className="text-3xl font-bold text-slate-900">{stats.statusBreakdown.slaughtered}</p>
+          <p className="text-xs text-slate-700 mt-1">Slaughtered</p>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import algosdk from 'algosdk';
 import { PaymentSplit } from '../types';
+import { PeraWalletService } from './peraWalletService';
 
 // Algorand Configuration
 const ALGOD_SERVER = 'https://testnet-api.algonode.cloud';
@@ -68,14 +69,20 @@ export const EscrowService = {
   /**
    * Execute atomic payment distribution on slaughter
    * Splits payment between farmer and platform in a single atomic transaction
+   * Now uses Pera Wallet for signing
    */
   executeSlaughterPayment: async (
     paymentSplit: PaymentSplit,
     totalAmount: number, // in microALGOs
-    adminAccount: algosdk.Account
+    adminWalletAddress: string
   ): Promise<{ txId: string; farmerAmount: number; platformAmount: number }> => {
     
     try {
+      console.log('💰 Executing payment split...');
+      console.log('📊 Total amount:', totalAmount / 1000000, 'ALGO');
+      console.log('👨‍🌾 Farmer:', paymentSplit.farmerPercentage + '%');
+      console.log('🏢 Platform:', paymentSplit.platformPercentage + '%');
+
       const params = await algodClient.getTransactionParams().do();
       
       // Calculate split amounts
@@ -84,7 +91,7 @@ export const EscrowService = {
 
       // Create payment transactions
       const txn1 = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-        sender: adminAccount.addr,
+        sender: adminWalletAddress,
         receiver: paymentSplit.farmerAddress,
         amount: farmerAmount,
         note: new TextEncoder().encode(`FarmChain: ${paymentSplit.farmerPercentage}% farmer share`),
@@ -92,7 +99,7 @@ export const EscrowService = {
       });
 
       const txn2 = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-        sender: adminAccount.addr,
+        sender: adminWalletAddress,
         receiver: paymentSplit.platformAddress,
         amount: platformAmount,
         note: new TextEncoder().encode(`FarmChain: ${paymentSplit.platformPercentage}% platform share`),
@@ -102,18 +109,18 @@ export const EscrowService = {
       // Group transactions atomically (both succeed or both fail)
       const txnGroup = algosdk.assignGroupID([txn1, txn2]);
 
-      // Sign both transactions
-      const signedTxn1 = txn1.signTxn(adminAccount.sk);
-      const signedTxn2 = txn2.signTxn(adminAccount.sk);
+      console.log('✍️ Requesting signature from Pera Wallet for payment split...');
+      // Sign both transactions with Pera Wallet
+      const signedTxns = await PeraWalletService.signTransactions([txn1, txn2], [adminWalletAddress, adminWalletAddress]);
 
       // Submit atomic group
-      const signedTxns = [signedTxn1, signedTxn2];
       const response = await algodClient.sendRawTransaction(signedTxns).do();
       const txId = typeof response === 'string' ? response : (response as any).txId || (response as any).txid;
       
       if (!txId) throw new Error('Failed to get transaction ID');
 
       // Wait for confirmation
+      console.log('⏳ Waiting for confirmation...');
       await algosdk.waitForConfirmation(algodClient, txId, 4);
 
       console.log('✅ Payment split executed:', {

@@ -66,12 +66,16 @@ const TransactionItem: React.FC<{ tx: Transaction; onDismiss?: (id: string) => v
           </div>
           {tx.txId && (
             <a
-              href={`https://testnet.algoexplorer.io/tx/${tx.txId}`}
+              href={
+                tx.description.includes('Minting NFT') 
+                  ? `https://testnet.algoexplorer.io/asset/${tx.txId}` 
+                  : `https://testnet.algoexplorer.io/tx/${tx.txId}`
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 mt-2"
             >
-              View on AlgoExplorer <ExternalLink className="w-3 h-3" />
+              {tx.description.includes('Minting NFT') ? 'View Asset on AlgoExplorer' : 'View on AlgoExplorer'} <ExternalLink className="w-3 h-3" />
             </a>
           )}
           {tx.error && (

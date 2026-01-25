@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Address Display Test</title>
+</head>
+<body>
+    <h1>Algorand Address Display Test</h1>
+    
+    <div>
+        <h2>Your Pera Wallet Address:</h2>
+        <p id="fullAddress"></p>
+        <p id="truncatedAddress"></p>
+    </div>
+
+    <script>
+        const address = "XFWB2RKNK6NHGEB5V6SC43GHIXXMBQ2AECE7CQHG545S2DN6QSFJNJKRH4";
+        
+        console.log("Full Address:", address);
+        console.log("Length:", address.length);
+        console.log("First 4:", address.substring(0, 4));
+        console.log("Last 4:", address.substring(address.length - 4));
+        
+        const truncated = `${address.substring(0, 4)}...${address.substring(address.length - 4)}`;
+        
+        document.getElementById('fullAddress').textContent = `Full: ${address}`;
+        document.getElementById('truncatedAddress').textContent = `Truncated: ${truncated}`;
+        
+        // Expected: XFWB...KRH4
+    </script>
+</body>
+</html>

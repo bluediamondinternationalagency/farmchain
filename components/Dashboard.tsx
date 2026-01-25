@@ -2,16 +2,25 @@ import React from 'react';
 import { Cow } from '../types';
 import { CowCard } from './CowCard';
 import { DashboardAnalytics } from './DashboardAnalytics';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, RefreshCw } from 'lucide-react';
 
 interface Props {
   cows: Cow[];
   onCowClick: (cow: Cow) => void;
   onNavigateToMarket: () => void;
+  onRefresh?: () => void;
   isDemoMode?: boolean;
+  isRefreshing?: boolean;
 }
 
-export const Dashboard: React.FC<Props> = ({ cows, onCowClick, onNavigateToMarket, isDemoMode = false }) => {
+export const Dashboard: React.FC<Props> = ({ 
+  cows, 
+  onCowClick, 
+  onNavigateToMarket, 
+  onRefresh,
+  isRefreshing = false,
+  isDemoMode = false 
+}) => {
   return (
     <div className="space-y-6 pb-20">
       {isDemoMode && cows.length > 0 && (
@@ -30,6 +39,17 @@ export const Dashboard: React.FC<Props> = ({ cows, onCowClick, onNavigateToMarke
           <h2 className="text-2xl font-bold text-slate-800">My Farm</h2>
           <p className="text-slate-500">Managing {cows.length} active heads of cattle</p>
         </div>
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Sync assets from blockchain"
+          >
+            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+            <span className="text-sm font-medium">{isRefreshing ? 'Syncing...' : 'Sync from Blockchain'}</span>
+          </button>
+        )}
       </div>
 
       {cows.length === 0 ? (

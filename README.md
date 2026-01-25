@@ -50,10 +50,13 @@ View your app in AI Studio: https://ai.studio/apps/drive/1VmnWH44Al_BD4-teEhn9de
 5. **Manage Portfolio** - View all your cattle investments in one place
 
 ### For Admins (Farm Operators):
-1. **Mint Cow NFTs** - Create new cattle as blockchain assets
-2. **Assign Ownership** - Transfer NFTs to investors
-3. **Update Records** - Maintain cattle health and weight data
-4. **Manage Inventory** - Track all cattle on the platform
+1. **Connect Authorized Wallet** - Use your whitelisted Pera Wallet
+2. **Mint Cow NFTs** - Create new cattle as blockchain assets
+3. **Assign Ownership** - Transfer NFTs to investors
+4. **Update Records** - Maintain cattle health and weight data
+5. **Manage Inventory** - Track all cattle on the platform
+
+**🔒 Admin Authorization:** Only whitelisted Pera Wallet addresses can access admin features. See [ADMIN_AUTHORIZATION_GUIDE.md](./ADMIN_AUTHORIZATION_GUIDE.md)
 
 ---
 
@@ -117,14 +120,36 @@ farmchain/
 
 ## 🔐 Admin Setup (First Time)
 
-The admin wallet is auto-generated on first launch. To use it:
+**Admin access is now secured with wallet-based authorization.**
 
-1. Run the app and click the **Admin Console** (shield icon 🛡️)
-2. Copy the admin wallet address
-3. Fund it with TestNet ALGO from the [dispenser](https://bank.testnet.algorand.network/)
-4. You can now mint cattle NFTs!
+### Quick Setup:
 
-**Minimum Balance:** 1 ALGO (for minting ~10 cows)
+1. **Copy `.env.example` to `.env.local`:**
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. **Add your Pera Wallet address to `.env.local`:**
+   ```bash
+   VITE_ADMIN_WHITELIST=YOUR_PERA_WALLET_ADDRESS_HERE
+   ```
+
+3. **Fund your Pera Wallet with TestNet ALGO:**
+   - Visit [Algorand Dispenser](https://bank.testnet.algorand.network/)
+   - Paste your Pera Wallet address
+   - Click "Dispense" to get 10 ALGO
+
+4. **Restart the app:**
+   ```bash
+   npm run dev
+   ```
+
+5. **Connect your Pera Wallet** - The shield icon (🛡️) will appear
+6. **Click the shield** to access Admin Console
+
+**📖 Full Guide:** See [ADMIN_AUTHORIZATION_GUIDE.md](./ADMIN_AUTHORIZATION_GUIDE.md) for detailed setup and security information.
+
+**Minimum Balance:** 0.2 ALGO per NFT mint
 
 ---
 

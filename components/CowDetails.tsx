@@ -178,6 +178,44 @@ export const CowDetails: React.FC<Props> = ({ cow, onBack, onUpdateCow, onSell }
             </div>
           </div>
 
+          {/* Additional Details */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+              <p className="text-xs text-blue-600 uppercase tracking-wide font-semibold mb-1">Sex</p>
+              <p className="text-lg font-bold text-slate-800 capitalize">{cow.sex || 'Female'}</p>
+            </div>
+            <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
+              <p className="text-xs text-purple-600 uppercase tracking-wide font-semibold mb-1">Breed</p>
+              <p className="text-lg font-bold text-slate-800">{cow.breed}</p>
+            </div>
+          </div>
+
+          {/* Vaccination Records */}
+          {cow.vaccination_records && cow.vaccination_records.length > 0 && (
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4">
+              <h4 className="font-bold text-green-800 mb-3">Vaccination Records</h4>
+              <div className="space-y-2">
+                {cow.vaccination_records.map((vac, idx) => (
+                  <div key={idx} className="bg-white p-3 rounded-lg border border-green-100">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-semibold text-slate-800 text-sm">{vac.vaccine}</span>
+                      <span className="text-xs text-slate-500">{new Date(vac.date).toLocaleDateString()}</span>
+                    </div>
+                    {vac.batch && (
+                      <p className="text-xs text-slate-600">Batch: {vac.batch}</p>
+                    )}
+                    {vac.veterinarian && (
+                      <p className="text-xs text-slate-600">Vet: {vac.veterinarian}</p>
+                    )}
+                    {vac.notes && (
+                      <p className="text-xs text-slate-500 mt-1">{vac.notes}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-6 relative overflow-hidden">
              <div className="flex items-start gap-3 relative z-10">
                <Sparkles className="text-indigo-500 shrink-0 mt-1" size={20} />

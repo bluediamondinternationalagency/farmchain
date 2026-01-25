@@ -14,51 +14,11 @@ import { Web3Service } from './services/web3Service';
 import { EscrowService } from './services/escrowService';
 import { IPFSService } from './services/ipfsService';
 import { SupplyChainService } from './services/supplyChainService';
-import { LayoutGrid, ShoppingBag, Sprout, ShieldCheck } from 'lucide-react';
+import { AuthService } from './services/authService';
+import { LayoutGrid, ShoppingBag, Sprout, ShieldCheck, AlertCircle } from 'lucide-react';
 
-// Demo user address for testing without wallet connection
-const DEMO_USER_ADDRESS = 'DEMO1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFG';
-
-const INITIAL_DB: Cow[] = [
-  {
-    id: '1',
-    name: 'Bessie',
-    breed: 'Holstein',
-    weight: 450,
-    purchasePrice: 5, // TestNet demo price
-    purchaseDate: Date.now() - (45 * 24 * 60 * 60 * 1000), 
-    expectedReturn: 10,
-    imageUrl: 'https://picsum.photos/seed/cow1/400/300',
-    cattleType: 'standard',
-    status: 'fattening',
-    healthScore: 92,
-    ownerAddress: DEMO_USER_ADDRESS, // Assigned to demo user for testing
-    supplyChain: [],
-    history: [
-      { date: Date.now() - (45 * 24 * 60 * 60 * 1000), weight: 400, note: "Initial check-in. Healthy." },
-      { date: Date.now() - (30 * 24 * 60 * 60 * 1000), weight: 415, note: "Good appetite, steady gain." },
-    ]
-  },
-  {
-    id: '2',
-    name: 'Ferdinand',
-    breed: 'Angus',
-    weight: 520,
-    purchasePrice: 7, // TestNet demo price
-    purchaseDate: Date.now() - (85 * 24 * 60 * 60 * 1000), 
-    expectedReturn: 12,
-    imageUrl: 'https://picsum.photos/seed/cow2/400/300',
-    cattleType: 'premium',
-    status: 'fattening',
-    healthScore: 88,
-    ownerAddress: DEMO_USER_ADDRESS, // Assigned to demo user for testing
-    supplyChain: [],
-    history: [
-        { date: Date.now() - (85 * 24 * 60 * 60 * 1000), weight: 450, note: "Arrived at ranch." },
-        { date: Date.now() - (40 * 24 * 60 * 60 * 1000), weight: 485, note: "Responding well to feed mix." },
-    ]
-  },
-];
+// LocalStorage keys
+const STORAGE_KEY_COWS = 'farmchain_cows';
 
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.LANDING);
@@ -69,40 +29,81 @@ const App: React.FC = () => {
     walletType: 'none'
   });
   const [authLoading, setAuthLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAuthorizedAdmin, setIsAuthorizedAdmin] = useState(false);
   
   // Lifted state: Single source of truth for all cows on "chain"
-  const [allCows, setAllCows] = useState<Cow[]>(INITIAL_DB);
+  // Load from localStorage if available, otherwise start with empty array
+  const [allCows, setAllCows] = useState<Cow[]>(() => {
+    const stored = localStorage.getItem(STORAGE_KEY_COWS);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error('Failed to parse stored cows:', e);
+      }
+    }
+    return [];
+  });
   const [selectedCow, setSelectedCow] = useState<Cow | null>(null);
 
   // Toast and Transaction hooks
   const { toasts, toast, removeToast } = useToast();
   const { transactions, addTransaction, updateTransaction, removeTransaction } = useTransactions();
 
+  // Check admin authorization whenever wallet changes
+  useEffect(() => {
+    const authorized = AuthService.isAuthorizedAdmin(wallet.address);
+    setIsAuthorizedAdmin(authorized);
+    
+    // If user is viewing admin panel but not authorized, redirect them
+    if (view === AppView.ADMIN && !authorized) {
+      setView(AppView.DASHBOARD);
+      if (wallet.address) {
+        toast.error('Access Denied', 'Your wallet is not authorized to access the Admin Console.');
+      }
+    }
+  }, [wallet.address]);
+
   // Debug logging
   useEffect(() => {
     console.log('🐄 All cows:', allCows.length);
     console.log('👤 Wallet:', wallet.address || 'Not connected');
+    console.log('🛡️ Admin authorized:', isAuthorizedAdmin);
     console.log('📊 View:', view);
-  }, [allCows, wallet.address, view]);
+  }, [allCows, wallet.address, view, isAuthorizedAdmin]);
 
   // Filter cows for the User Dashboard
   const myCows = wallet.isConnected 
     ? allCows.filter(c => c.ownerAddress === wallet.address)
-    : allCows.filter(c => c.ownerAddress === DEMO_USER_ADDRESS); // Demo mode: show demo user's cattle
+    : []; // Not connected: show empty
 
-  // Show demo cattle if user has no cattle (for better UX)
-  const displayCows = wallet.isConnected && myCows.length === 0
-    ? allCows.filter(c => c.ownerAddress === DEMO_USER_ADDRESS) // Show demo cattle if user has none
-    : myCows;
+  // Only show user's actual assets
+  const displayCows = myCows;
 
   useEffect(() => {
     console.log('🏠 My cows:', myCows.length, myCows.map(c => c.name));
     console.log('📺 Display cows:', displayCows.length, displayCows.map(c => c.name));
   }, [myCows, displayCows]);
 
+  // Save cows to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_COWS, JSON.stringify(allCows));
+  }, [allCows]);
+
   // Initialize Admin Account if missing (for demo purposes)
   useEffect(() => {
     Web3Service.getAdminAccount();
+  }, []);
+
+  // Make clearOldData available globally for users to reset if needed
+  useEffect(() => {
+    (window as any).clearFarmChainData = () => {
+      localStorage.removeItem(STORAGE_KEY_COWS);
+      setAllCows([]);
+      console.log('✅ FarmChain data cleared. Refresh the page.');
+    };
+    console.log('💡 To clear old demo data, run: window.clearFarmChainData()');
   }, []);
 
   const refreshBalance = async (address: string) => {
@@ -110,19 +111,86 @@ const App: React.FC = () => {
     setWallet(prev => ({ ...prev, balance: bal }));
   };
 
+  // Fetch user's assets from blockchain and sync with local state
+  const syncAssetsFromBlockchain = async (address: string) => {
+    try {
+      const assets = await Web3Service.getUserAssets(address);
+      console.log('🔄 Fetched assets from blockchain:', assets);
+      
+      // For each asset the user holds, check if we have it locally
+      // If not, try to fetch metadata and create a Cow object
+      for (const asset of assets) {
+        if (asset.amount > 0 && asset['asset-id']) {
+          const assetId = asset['asset-id'];
+          
+          // Check if we already have this asset in our local state
+          const existingCow = allCows.find(c => c.assetId === assetId);
+          
+          if (!existingCow) {
+            // Fetch asset metadata from blockchain
+            const metadata = await Web3Service.getNFTMetadata(assetId);
+            
+            if (metadata && metadata.assetInfo) {
+              const assetInfo = metadata.assetInfo;
+              const arc69 = metadata.metadata;
+              
+              // Create a Cow object from the blockchain data
+              const newCow: Cow = {
+                id: `asset-${assetId}`,
+                name: assetInfo.params.name || `Asset #${assetId}`,
+                breed: arc69?.properties?.breed || 'Unknown',
+                weight: arc69?.properties?.weight || 400,
+                purchasePrice: 5,
+                purchaseDate: Date.now(),
+                expectedReturn: 10,
+                imageUrl: assetInfo.params.url?.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') || 'https://picsum.photos/seed/cow/400/300',
+                cattleType: 'standard',
+                status: arc69?.properties?.status || 'fattening',
+                healthScore: arc69?.properties?.health_score || 85,
+                ownerAddress: address,
+                assetId: assetId,
+                supplyChain: [],
+                history: []
+              };
+              
+              // Add to local state
+              setAllCows(prev => [...prev, newCow]);
+              console.log('✅ Synced new asset from blockchain:', newCow.name);
+            }
+          } else {
+            // Update owner if it changed
+            if (existingCow.ownerAddress !== address) {
+              setAllCows(prev => prev.map(c => 
+                c.assetId === assetId ? { ...c, ownerAddress: address } : c
+              ));
+              console.log('✅ Updated owner for:', existingCow.name);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to sync assets from blockchain:', e);
+    }
+  };
+
   // Check for existing Pera Wallet session on load
   useEffect(() => {
     const reconnectWallet = async () => {
       try {
         const address = await Web3Service.reconnectPeraWallet();
+        console.log('🔄 Reconnecting Pera Wallet - Address:', address);
         if (address) {
           const bal = await Web3Service.getBalance(address);
+          console.log('💰 Reconnected Balance:', bal, 'ALGO');
           setWallet({
             isConnected: true,
             address: address,
             balance: bal,
             walletType: 'pera'
           });
+          
+          // Sync assets from blockchain
+          await syncAssetsFromBlockchain(address);
         }
       } catch (e) {
         console.error('Failed to reconnect Pera Wallet:', e);
@@ -145,9 +213,12 @@ const App: React.FC = () => {
       setAuthLoading(true);
       try {
         const accounts = await Web3Service.connectPeraWallet();
+        console.log('🔌 Pera Wallet Connected - Accounts:', accounts);
         if (accounts && accounts.length > 0) {
           const address = accounts[0];
+          console.log('✅ Using address:', address);
           const bal = await Web3Service.getBalance(address);
+          console.log('💰 Balance:', bal, 'ALGO');
           
           setWallet({
             isConnected: true,
@@ -155,6 +226,9 @@ const App: React.FC = () => {
             balance: bal,
             walletType: 'pera'
           });
+          
+          // Sync assets from blockchain
+          await syncAssetsFromBlockchain(address);
         }
       } catch (e) {
         console.error('Pera Wallet connection failed:', e);
@@ -162,6 +236,24 @@ const App: React.FC = () => {
       } finally {
         setAuthLoading(false);
       }
+    }
+  };
+
+  const handleRefreshAssets = async () => {
+    if (!wallet.isConnected || !wallet.address) {
+      toast.info('Connect Wallet', 'Please connect your wallet first to sync assets.');
+      return;
+    }
+    
+    setIsRefreshing(true);
+    try {
+      await syncAssetsFromBlockchain(wallet.address);
+      toast.success('Sync Complete', 'Your assets have been synced from the blockchain.');
+    } catch (e: any) {
+      console.error('Failed to refresh assets:', e);
+      toast.error('Sync Failed', e.message || 'Failed to sync assets from blockchain.');
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -175,9 +267,9 @@ const App: React.FC = () => {
     setSelectedCow(updatedCow);
     
     // Update on-chain metadata if asset exists
-    if (updatedCow.assetId) {
+    if (updatedCow.assetId && wallet.address) {
       try {
-        const txId = await Web3Service.updateCowNFT(updatedCow);
+        const txId = await Web3Service.updateNFTMetadata(updatedCow.assetId, updatedCow, wallet.address);
         console.log('Metadata updated on-chain. TxID:', txId);
         
         // Mark the update time
@@ -198,21 +290,29 @@ const App: React.FC = () => {
   };
 
   const handleMintCow = async (newCow: Cow) => {
+    if (!wallet.address) {
+      toast.error('Wallet Required', 'Please connect your Pera Wallet to mint NFTs.');
+      return false;
+    }
+
     const txId = addTransaction(`Minting NFT for ${newCow.name}`);
     try {
       updateTransaction(txId, { state: 'confirming' });
-      // Real Blockchain Interaction
-      const assetId = await Web3Service.mintCowNFT(newCow);
+      // Real Blockchain Interaction - Sign with connected Pera Wallet
+      const assetId = await Web3Service.mintCowNFT(newCow, wallet.address);
       
-      const mintedCow = { ...newCow, assetId };
+      // Convert BigInt to number for storage
+      const assetIdNumber = typeof assetId === 'bigint' ? Number(assetId) : assetId;
+      
+      const mintedCow = { ...newCow, assetId: assetIdNumber };
       setAllCows(prev => [...prev, mintedCow]);
-      updateTransaction(txId, { state: 'confirmed', txId: assetId?.toString() });
+      updateTransaction(txId, { state: 'confirmed', txId: assetIdNumber?.toString() });
       toast.success('NFT Minted', `${newCow.name} has been minted successfully!`);
       return true;
     } catch (e: any) {
       console.error(e);
       updateTransaction(txId, { state: 'failed', error: e.message });
-      toast.error('Minting Failed', e.message || 'Ensure Admin wallet is funded!');
+      toast.error('Minting Failed', e.message || 'Transaction failed or was rejected.');
       return false;
     }
   };
@@ -223,12 +323,17 @@ const App: React.FC = () => {
       toast.warning('Assignment Failed', 'Asset not minted on chain yet.');
       return;
     }
+
+    if (!wallet.address || !wallet.isConnected) {
+      toast.error('Wallet Required', 'Please connect your Pera Wallet to transfer NFTs.');
+      return;
+    }
     
     const txId = addTransaction(`Assigning ${cow.name} to user`);
     try {
       updateTransaction(txId, { state: 'confirming' });
-      // Real Blockchain Transfer (OptIn + Send)
-      await Web3Service.assignAssetToUser(cow.assetId, address);
+      // Real Blockchain Transfer (OptIn + Send) - Both signed by Pera Wallet
+      await Web3Service.assignAssetToUser(cow.assetId, address, wallet.address);
       
       setAllCows(prev => prev.map(c => c.id === cowId ? { ...c, ownerAddress: address } : c));
       updateTransaction(txId, { state: 'confirmed' });
@@ -241,7 +346,7 @@ const App: React.FC = () => {
     } catch (e: any) {
       console.error(e);
       updateTransaction(txId, { state: 'failed', error: e.message });
-      toast.error('Assignment Failed', e.message || 'Ensure User wallet has funds for Opt-In!');
+      toast.error('Assignment Failed', e.message || 'Transaction failed or was rejected.');
     }
   };
 
@@ -260,14 +365,18 @@ const App: React.FC = () => {
       return;
     }
 
+    if (!wallet.address || !wallet.isConnected) {
+      toast.error('Wallet Required', 'Please connect your Pera Wallet to process slaughter.');
+      return;
+    }
+
     const txId = addTransaction(`Processing slaughter for ${cow.name}`);
     
     try {
       updateTransaction(txId, { state: 'confirming' });
 
-      // Get admin account
-      const adminAccountInfo = Web3Service.getAdminAccount();
-      const adminAccount = algosdk.mnemonicToSecretKey(adminAccountInfo.mnemonic);
+      console.log('🔪 Processing slaughter...');
+      console.log('📍 Admin wallet (Pera):', wallet.address);
       
       // Get payment split configuration for this cattle type
       const savedConfigs = localStorage.getItem('farmchain_payment_splits');
@@ -304,7 +413,7 @@ const App: React.FC = () => {
       const paymentResult = await EscrowService.executeSlaughterPayment(
         paymentSplit,
         Math.floor(slaughterInfo.netPrice * 1000000), // Convert to microALGOs
-        adminAccount
+        wallet.address
       );
 
       console.log('Payment split executed. TxID:', paymentResult.txId);
@@ -336,7 +445,7 @@ const App: React.FC = () => {
           date: slaughterInfo.date,
           certificateCID
         },
-        adminAccount
+        wallet.address
       );
 
       console.log('Slaughter recorded on-chain. TxID:', eventTxId);
@@ -439,14 +548,16 @@ const App: React.FC = () => {
               </button>
             </div>
 
-            {/* Admin Toggle */}
-            <button 
-              onClick={() => setView(view === AppView.ADMIN ? AppView.DASHBOARD : AppView.ADMIN)}
-              className={`p-2 rounded-full transition-colors ${view === AppView.ADMIN ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-100'}`}
-              title="Toggle Admin Console"
-            >
-              <ShieldCheck size={18} />
-            </button>
+            {/* Admin Toggle - Only show if authorized */}
+            {wallet.isConnected && isAuthorizedAdmin && (
+              <button 
+                onClick={() => setView(view === AppView.ADMIN ? AppView.DASHBOARD : AppView.ADMIN)}
+                className={`p-2 rounded-full transition-colors ${view === AppView.ADMIN ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-100'}`}
+                title="Admin Console"
+              >
+                <ShieldCheck size={18} />
+              </button>
+            )}
 
             <WalletButton wallet={wallet} onConnect={handleConnectWallet} loading={authLoading} />
           </div>
@@ -455,13 +566,35 @@ const App: React.FC = () => {
         {/* Main Content */}
         <main className="p-4 md:p-8 lg:p-12 pb-20 md:pb-8">
           {view === AppView.ADMIN ? (
-             <AdminDashboard 
-               allCows={allCows} 
-               onMintCow={handleMintCow}
-               onAssignCow={handleAssignCow}
-               onDeleteCow={handleDeleteCow}
-               onSlaughterCattle={handleSlaughterCattle}
-             />
+            isAuthorizedAdmin ? (
+              <AdminDashboard 
+                allCows={allCows} 
+                onMintCow={handleMintCow}
+                onAssignCow={handleAssignCow}
+                onDeleteCow={handleDeleteCow}
+                onSlaughterCattle={handleSlaughterCattle}
+                onUpdateCow={handleUpdateCow}
+                walletAddress={wallet.address}
+                walletBalance={wallet.balance}
+              />
+            ) : (
+              <div className="max-w-md mx-auto mt-12 bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                <AlertCircle className="mx-auto mb-4 text-red-500" size={48} />
+                <h2 className="text-xl font-bold text-red-800 mb-2">Access Denied</h2>
+                <p className="text-red-600 mb-4">
+                  Your wallet address is not authorized to access the Admin Console.
+                </p>
+                <p className="text-sm text-red-500">
+                  Only whitelisted addresses can mint NFTs and manage the platform.
+                </p>
+                <button
+                  onClick={() => setView(AppView.DASHBOARD)}
+                  className="mt-6 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
+            )
           ) : (
             <>
               {view === AppView.DASHBOARD && (
@@ -469,7 +602,9 @@ const App: React.FC = () => {
                   cows={displayCows} 
                   onCowClick={handleCowClick}
                   onNavigateToMarket={() => setView(AppView.MARKET)}
-                  isDemoMode={wallet.isConnected && myCows.length === 0}
+                  onRefresh={wallet.isConnected ? handleRefreshAssets : undefined}
+                  isRefreshing={isRefreshing}
+                  isDemoMode={false}
                 />
               )}
 

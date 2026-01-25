@@ -1,6 +1,7 @@
 import algosdk from 'algosdk';
 import { SupplyChainEvent, Cow } from '../types';
 import { IPFSService } from './ipfsService';
+import { PeraWalletService } from './peraWalletService';
 
 // Algorand Configuration
 const ALGOD_SERVER = 'https://testnet-api.algonode.cloud';
@@ -19,11 +20,12 @@ export const SupplyChainService = {
 
   /**
    * Record a supply chain event on-chain using ARC-69
+   * Now uses Pera Wallet for signing
    */
   recordEventOnChain: async (
     assetId: number,
     event: Omit<SupplyChainEvent, 'id' | 'txId'>,
-    adminAccount: algosdk.Account
+    adminWalletAddress: string
   ): Promise<string> => {
     
     try {
@@ -42,10 +44,10 @@ export const SupplyChainService = {
 
       // Asset config transaction to record history in note field
       const txn = algosdk.makeAssetConfigTxnWithSuggestedParamsFromObject({
-        sender: adminAccount.addr,
+        sender: adminWalletAddress,
         assetIndex: assetId,
-        manager: adminAccount.addr,
-        reserve: adminAccount.addr,
+        manager: adminWalletAddress,
+        reserve: adminWalletAddress,
         freeze: undefined,
         clawback: undefined,
         note: note,
@@ -53,7 +55,8 @@ export const SupplyChainService = {
         strictEmptyAddressChecking: false,
       });
 
-      const signedTxn = txn.signTxn(adminAccount.sk);
+      // Sign with Pera Wallet
+      const signedTxn = await PeraWalletService.signTransaction(txn, adminWalletAddress);
       const response = await algodClient.sendRawTransaction(signedTxn).do();
       const txId = typeof response === 'string' ? response : (response as any).txId || (response as any).txid;
       
@@ -226,7 +229,7 @@ export const SupplyChainService = {
       date: number;
       certificateCID: string;
     },
-    adminAccount: algosdk.Account
+    adminWalletAddress: string
   ): Promise<string> => {
     
     const event: Omit<SupplyChainEvent, 'id' | 'txId'> = {
@@ -242,7 +245,7 @@ export const SupplyChainService = {
       ipfsCID: slaughterData.certificateCID
     };
 
-    return await SupplyChainService.recordEventOnChain(assetId, event, adminAccount);
+    return await SupplyChainService.recordEventOnChain(assetId, event, adminWalletAddress);
   },
 
   /**
