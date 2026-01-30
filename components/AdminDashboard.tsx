@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Cow, PaymentSplitConfig, SlaughterInfo } from '../types';
-import { Plus, UserPlus, FileText, Database, ShieldCheck, ChevronRight, Search, Trash2, Loader2, Settings } from 'lucide-react';
+import { Plus, UserPlus, FileText, Database, ShieldCheck, ChevronRight, Search, Trash2, Loader2, Settings, Menu, X, ChevronLeft } from 'lucide-react';
 import { Web3Service } from '../services/web3Service';
 import { AdminSettings } from './AdminSettings';
 import { SlaughterModal } from './SlaughterModal';
@@ -22,6 +22,8 @@ interface Props {
 export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCow, onDeleteCow, onSlaughterCattle, onUpdateCow, walletAddress, walletBalance }) => {
   const [activeTab, setActiveTab] = useState<'mint' | 'inventory' | 'livestock' | 'wallet'>('livestock');
   const [inventoryFilter, setInventoryFilter] = useState<'all' | 'assigned' | 'unassigned' | 'slaughtered'>('all');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   
   // Toast hook
   const { toast } = useToast();
@@ -180,12 +182,28 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
   const filteredCows = getFilteredCows();
 
   return (
-    <div className="pb-20">
-      <div className="bg-slate-900 text-white p-8 rounded-2xl mb-8 shadow-xl flex flex-col md:flex-row justify-between items-end md:items-center">
-        <div>
+    <div className="pb-20 relative">
+      {/* Mobile Sidebar Overlay */}
+      {mobileSidebarOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/50 z-40" 
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
+      <div className="bg-slate-900 text-white p-4 md:p-8 rounded-2xl mb-8 shadow-xl flex flex-col md:flex-row justify-between items-end md:items-center">
+        <div className="flex-1">
            <div className="flex items-center gap-3 mb-2">
-             <ShieldCheck className="text-emerald-400 h-8 w-8" />
-             <h2 className="text-3xl font-bold tracking-tight">Admin Console</h2>
+             {/* Mobile Menu Toggle */}
+             <button
+               onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+               className="lg:hidden p-2 hover:bg-slate-800 rounded-lg transition-colors mr-2"
+               aria-label="Toggle menu"
+             >
+               {mobileSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+             </button>
+             <ShieldCheck className="text-emerald-400 h-6 md:h-8 w-6 md:w-8" />
+             <h2 className="text-xl md:text-3xl font-bold tracking-tight">Admin Console</h2>
            </div>
            <p className="text-slate-400">Nerve Venture • Algorand Network Manager</p>
            <div className="mt-2 text-xs text-slate-500 flex flex-col gap-1">
@@ -239,62 +257,107 @@ export const AdminDashboard: React.FC<Props> = ({ allCows, onMintCow, onAssignCo
         </div>
       </div>
 
-      <div className="lg:grid lg:grid-cols-12 lg:gap-8 items-start">
+      <div className="lg:grid lg:gap-8 items-start" style={{ gridTemplateColumns: sidebarCollapsed ? '80px 1fr' : '280px 1fr' }}>
         {/* Sidebar Navigation */}
-        <div className="lg:col-span-3 mb-6 lg:mb-0">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden sticky top-24">
-             <div className="p-4 bg-slate-50 border-b border-slate-100">
-               <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide">Menu</h3>
-             </div>
-             <nav className="p-2 space-y-1">
-               <button 
-                 onClick={() => setActiveTab('livestock')}
-                 className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors ${activeTab === 'livestock' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}
+        <div className={`
+          ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0
+          fixed lg:sticky top-0 lg:top-24 left-0 h-screen lg:h-auto
+          transition-all duration-300 ease-in-out
+          z-50 lg:z-auto
+          ${sidebarCollapsed ? 'lg:w-20' : 'w-72 lg:w-full'}
+        `}>
+          <div className="bg-white rounded-none lg:rounded-xl border-r lg:border border-slate-200 shadow-2xl lg:shadow-sm overflow-hidden h-full lg:h-auto">
+             <div className="p-4 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 flex items-center justify-between">
+               {!sidebarCollapsed && (
+                 <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide">Navigation</h3>
+               )}
+               <button
+                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                 className="hidden lg:block p-1.5 hover:bg-slate-200 rounded-lg transition-colors ml-auto"
+                 title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                >
-                 <div className="flex items-center gap-3">
-                   <FileText size={18} /> All Livestock
-                 </div>
-                 <span className="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-bold">{allCows.length}</span>
+                 {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
                </button>
+             </div>
+             <nav className="p-2 space-y-1.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
                <button 
-                 onClick={() => setActiveTab('inventory')}
-                 className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors ${activeTab === 'inventory' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}
+                 onClick={() => {
+                   setActiveTab('livestock');
+                   setMobileSidebarOpen(false);
+                 }}
+                 className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} p-3 rounded-lg text-left transition-all hover:scale-105 ${activeTab === 'livestock' ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-lg' : 'text-slate-600 hover:bg-slate-50'}`}
+                 title={sidebarCollapsed ? 'All Livestock' : ''}
                >
                  <div className="flex items-center gap-3">
-                   <Database size={18} /> Inventory
+                   <FileText size={18} className={activeTab === 'livestock' ? 'text-white' : ''} />
+                   {!sidebarCollapsed && <span>All Livestock</span>}
                  </div>
-                 {unassignedCows.length > 0 && (
-                   <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-bold">{unassignedCows.length}</span>
+                 {!sidebarCollapsed && (
+                   <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${activeTab === 'livestock' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'}`}>{allCows.length}</span>
                  )}
                </button>
                <button 
-                 onClick={() => setActiveTab('mint')}
-                 className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors ${activeTab === 'mint' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}
+                 onClick={() => {
+                   setActiveTab('inventory');
+                   setMobileSidebarOpen(false);
+                 }}
+                 className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} p-3 rounded-lg text-left transition-all hover:scale-105 ${activeTab === 'inventory' ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-lg' : 'text-slate-600 hover:bg-slate-50'}`}
+                 title={sidebarCollapsed ? 'Inventory' : ''}
                >
                  <div className="flex items-center gap-3">
-                   <Plus size={18} /> Mint New Asset
+                   <Database size={18} className={activeTab === 'inventory' ? 'text-white' : ''} />
+                   {!sidebarCollapsed && <span>Inventory</span>}
                  </div>
-                 <ChevronRight size={16} className="opacity-50" />
+                 {!sidebarCollapsed && unassignedCows.length > 0 && (
+                   <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${activeTab === 'inventory' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'}`}>{unassignedCows.length}</span>
+                 )}
                </button>
                <button 
-                 onClick={() => setActiveTab('wallet')}
-                 className={`w-full flex items-center justify-between p-3 rounded-lg text-left transition-colors ${activeTab === 'wallet' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50'}`}
+                 onClick={() => {
+                   setActiveTab('mint');
+                   setMobileSidebarOpen(false);
+                 }}
+                 className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} p-3 rounded-lg text-left transition-all hover:scale-105 ${activeTab === 'mint' ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold shadow-lg' : 'text-slate-600 hover:bg-slate-50'}`}
+                 title={sidebarCollapsed ? 'Mint New Asset' : ''}
                >
                  <div className="flex items-center gap-3">
-                   <ShieldCheck size={18} /> Wallet Settings
+                   <Plus size={18} className={activeTab === 'mint' ? 'text-white' : ''} />
+                   {!sidebarCollapsed && <span>Mint New Asset</span>}
                  </div>
-                 <ChevronRight size={16} className="opacity-50" />
+                 {!sidebarCollapsed && (
+                   <ChevronRight size={16} className="opacity-50" />
+                 )}
+               </button>
+               <button 
+                 onClick={() => {
+                   setActiveTab('wallet');
+                   setMobileSidebarOpen(false);
+                 }}
+                 className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} p-3 rounded-lg text-left transition-all hover:scale-105 ${activeTab === 'wallet' ? 'bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold shadow-lg' : 'text-slate-600 hover:bg-slate-50'}`}
+                 title={sidebarCollapsed ? 'Wallet Settings' : ''}
+               >
+                 <div className="flex items-center gap-3">
+                   <ShieldCheck size={18} className={activeTab === 'wallet' ? 'text-white' : ''} />
+                   {!sidebarCollapsed && <span>Wallet Settings</span>}
+                 </div>
+                 {!sidebarCollapsed && (
+                   <ChevronRight size={16} className="opacity-50" />
+                 )}
                </button>
              </nav>
-             <div className="p-4 mt-4 border-t border-slate-100">
-                <div className="text-xs text-slate-400">Total Assets Managed</div>
-                <div className="text-xl font-bold text-slate-800">{allCows.length}</div>
-             </div>
+             {!sidebarCollapsed && (
+               <div className="p-4 mt-4 border-t border-slate-100 bg-gradient-to-br from-slate-50 to-white">
+                 <div className="text-xs text-slate-500 font-medium mb-1">Total Assets Managed</div>
+                 <div className="text-2xl font-bold text-slate-800">{allCows.length}</div>
+                 <div className="mt-2 text-xs text-slate-400">Active on Testnet</div>
+               </div>
+             )}
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="lg:col-span-9">
+        <div className="flex-1 min-w-0">
           
           {activeTab === 'mint' && (
             <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm max-w-3xl">

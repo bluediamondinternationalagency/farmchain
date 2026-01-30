@@ -22,11 +22,12 @@ export const Dashboard: React.FC<Props> = ({
   isDemoMode = false 
 }) => {
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 animate-fadeIn">
       {isDemoMode && cows.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <p className="text-blue-800 text-sm">
-            💡 <strong>Demo Mode:</strong> These are demo cattle. Connect your wallet and visit the Admin Console to mint cattle and assign them to your wallet address.
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 shadow-sm">
+          <p className="text-blue-800 text-sm flex items-start gap-2">
+            <span className="text-lg">💡</span>
+            <span><strong>Demo Mode:</strong> These are demo cattle. Connect your wallet and visit the Admin Console to mint cattle and assign them to your wallet address.</span>
           </p>
         </div>
       )}
@@ -34,36 +35,36 @@ export const Dashboard: React.FC<Props> = ({
       {/* Analytics Dashboard */}
       <DashboardAnalytics cows={cows} />
       
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">My Farm</h2>
-          <p className="text-slate-500">Managing {cows.length} active heads of cattle</p>
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-800">My Ranch</h2>
+          <p className="text-slate-500 text-sm md:text-base">Managing {cows.length} active head{cows.length !== 1 ? 's' : ''} of cattle</p>
         </div>
         {onRefresh && (
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-700 rounded-lg hover:from-emerald-100 hover:to-emerald-200 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed border border-emerald-200 hover:shadow-md"
             title="Sync assets from blockchain"
           >
             <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-            <span className="text-sm font-medium">{isRefreshing ? 'Syncing...' : 'Sync from Blockchain'}</span>
+            <span className="text-sm font-medium">{isRefreshing ? 'Syncing...' : 'Sync Assets'}</span>
           </button>
         )}
       </div>
 
       {cows.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
-          <div className="inline-block p-4 rounded-full bg-slate-50 mb-4">
-             <PlusCircle size={32} className="text-slate-400" />
+        <div className="text-center py-16 md:py-20 bg-gradient-to-br from-white to-slate-50 rounded-2xl border-2 border-dashed border-slate-300 shadow-inner">
+          <div className="inline-block p-5 rounded-full bg-gradient-to-br from-slate-50 to-slate-100 mb-4 shadow-sm">
+             <PlusCircle size={40} className="text-slate-400" />
           </div>
-          <h3 className="text-lg font-medium text-slate-800 mb-2">Your ranch is empty</h3>
-          <p className="text-slate-500 mb-6 max-w-xs mx-auto">Start your investment journey by purchasing your first cattle from the marketplace.</p>
+          <h3 className="text-xl font-semibold text-slate-800 mb-2">Your ranch is empty</h3>
+          <p className="text-slate-500 mb-6 max-w-md mx-auto px-4">Start your investment journey by purchasing your first cattle from the marketplace.</p>
           <button 
             onClick={onNavigateToMarket}
-            className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+            className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-8 py-3 rounded-lg font-medium hover:from-emerald-700 hover:to-emerald-600 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
           >
-            Go to Marketplace
+            Explore Marketplace
           </button>
         </div>
       ) : (
@@ -77,15 +78,15 @@ export const Dashboard: React.FC<Props> = ({
       {/* Stats Summary */}
       {cows.length > 0 && (
         <div className="grid grid-cols-2 gap-4 mt-8">
-          <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-            <p className="text-blue-600 text-sm font-medium">Total Investment</p>
-            <p className="text-2xl font-bold text-slate-800">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-blue-700 text-sm font-semibold mb-1">Total Investment</p>
+            <p className="text-2xl md:text-3xl font-bold text-slate-800">
               {cows.reduce((acc, cow) => acc + cow.purchasePrice, 0).toLocaleString()} ALGO
             </p>
           </div>
-          <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-            <p className="text-emerald-600 text-sm font-medium">Proj. Value</p>
-            <p className="text-2xl font-bold text-slate-800">
+          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-5 rounded-xl border border-emerald-200 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-emerald-700 text-sm font-semibold mb-1">Projected Value</p>
+            <p className="text-2xl md:text-3xl font-bold text-slate-800">
               {(cows.reduce((acc, cow) => acc + (cow.purchasePrice * (1 + cow.expectedReturn/100)), 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })} ALGO
             </p>
           </div>
